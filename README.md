@@ -14,12 +14,12 @@ entregas está en [`docs/historial/`](docs/historial/).
 ```mermaid
 flowchart LR
     subgraph HOST["Equipo anfitrión"]
-        C1["Cliente 1<br/>juego Swing"]
+        C1["Cliente 1<br/>juego "]
         C2["Cliente N<br/>hasta 4"]
     end
     subgraph VM["Máquina virtual"]
-        S["Servidor Java<br/>puerto 5555"]
-        DB[("MySQL<br/>restordb")]
+        S["Servidor Java<br/>"]
+        DB[("MySQL<br/>nameDATABASE")]
     end
     C1 -- "JSON por TCP" --> S
     C2 -- "JSON por TCP" --> S
