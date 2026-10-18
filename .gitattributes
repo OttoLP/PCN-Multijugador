@@ -1,2 +1,12 @@
-# Auto detect text files and perform LF normalization
+# Detecta archivos de texto y normaliza saltos de línea
 * text=auto
+
+# Los scripts deben conservar el salto de línea que su sistema espera
+*.sh  text eol=lf
+*.bat text eol=crlf
+
+# Binarios
+*.png binary
+*.jar binary
+*.pdf binary
+*.docx binary
