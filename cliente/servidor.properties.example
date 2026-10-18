@@ -1,0 +1,4 @@
+# Copia este archivo como "servidor.properties" (en esta misma carpeta, cliente/)
+# y escribe la IP de la VM donde corre el servidor. servidor.properties NO se sube a git.
+# En la VM puedes ver su IP con: ip a   (Linux)  o  ipconfig  (Windows)
+servidor.ip=IP_DE_LA_VM
