@@ -78,15 +78,5 @@ para que nadie más haga lo mismo.
 
 ## Para quien administra el repositorio
 
-Configurar una sola vez en GitHub:
+1. ** Quedo pendiente lo de proteger el MAIN ( OTONIEL DEL FUTURO, POR FAVOR CONFIGURA LOS CAMBIOS PARA PROTEGER EL MAIN).
 
-1. **Settings → Collaborators:** agrega a cada integrante del equipo.
-2. **Settings → Branches** (o **Rules → Rulesets**): protege `main` exigiendo Pull Request con al menos
-   1 aprobación y bloqueando los *force push*.
-3. **Settings → General → Pull Requests:** activa *Squash merging* y *Automatically delete head branches*.
-4. Al cerrar cada entrega, crea un tag para poder volver a ese estado:
-
-   ```bash
-   git tag -a parcial-3 -m "Entrega parcial 3"
-   git push origin parcial-3
-   ```
