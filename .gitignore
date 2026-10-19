@@ -33,3 +33,6 @@ nbproject/private/
 # --- Sistema operativo ---
 .DS_Store
 Thumbs.db
+**.classpath
+**.project
+**.settings
