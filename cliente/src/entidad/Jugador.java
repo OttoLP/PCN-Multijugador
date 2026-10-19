@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.awt.Rectangle;
 
 import javax.imageio.ImageIO;
 
@@ -15,19 +16,26 @@ public class Jugador extends Entidad {
     private KeyManager2 mT;
     private int id;
     private String usuario;
+    private final int xPantalla, yPantalla;
 
     public Jugador(GamePanel gp, KeyManager2 mT, int id, String usuario){
         this.gp = gp;
         this.mT = mT;
         this.id = id;
         this.usuario = usuario;
+        this.xPantalla = gp.getWidthScreen() / 2 - (gp.getTileSize() / 2);
+        this.yPantalla = gp.getWidthScreen() / 2 - (gp.getTileSize() / 2);
+        this.hitbox = new Rectangle(8, 16, 32, 32);
 
         configuracionInicial();
         getSpritesJugador();
     }
+
     public void configuracionInicial(){
-        this.x = 100;
-        this.y = 100;
+        this.xMundo = gp.getTileSize() * 22;
+        this.yMundo = gp.getTileSize() * 39;
+        this.x = gp.getWidthScreen() / 2;
+        this.y = gp.getHeightScreen() / 2;
         this.velocidad = 4;
         this.setDireccion("abajo");
     }

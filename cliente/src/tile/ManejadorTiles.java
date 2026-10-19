@@ -2,18 +2,25 @@ package tile;
 
 import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
 import main.GamePanel;
 
 
 public class ManejadorTiles {
-    private GamePanel gP;
+    private GamePanel gp;
     private int maxTiles = 10;
     Tile[] arregloTiles;
+    private int mapCodeTile[][];
 
-    public ManejadorTiles(GamePanel gP){
-        this.gP = gP;
+    public ManejadorTiles(GamePanel gp){
+        this.gp = gp;
         this.arregloTiles = new Tile[maxTiles];
+        this.mapCodeTile = new int[gp.getMaxRows()][gp.getMaxCols()];
         getImagenesTile();
+        cargarEscenario();
     }
     
     void getImagenesTile(){
@@ -49,26 +56,33 @@ public class ManejadorTiles {
 
     }
 
-    public void draw(Graphics2D g2){
-
-        for (int i = 0; i < gP.getMaxCols(); i++){
-            for (int j = 0; j < gP.getMaxRows(); j++){
-                g2.drawImage(arregloTiles[4].getImage(), i * gP.getTileSize(), j * gP.getTileSize(), gP.getTileSize(), gP.getTileSize(), null);
+    public void cargarEscenario() {
+        try (InputStream scenario = getClass().getResourceAsStream("/escenarios/mapa.txt")) {
+            if (scenario == null) {
+                System.err.println("No se encontró /escenarios/map.txt");
+                return;
             }
+            BufferedReader br = new BufferedReader(new InputStreamReader(scenario));
+            for (int ren = 0; ren < gp.getMaxRows(); ren++) {
+                String dataRow = br.readLine();
+                if (dataRow == null) break;
+                String[] codes = dataRow.trim().split(" ");
+                for (int col = 0; col < gp.getMaxCols(); col++) {
+                    this.mapCodeTile[ren][col] = Integer.parseInt(codes[col]);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        /* 
-        g2.drawImage(arregloTiles[0].getImage(), 0, 0, gP.getTileSize(), gP.getTileSize(), null);
-        g2.drawImage(arregloTiles[1].getImage(), gP.getTileSize(), 0, gP.getTileSize(), gP.getTileSize(), null);
-        g2.drawImage(arregloTiles[2].getImage(), gP.getTileSize() * 2, 0, gP.getTileSize(), gP.getTileSize(), null);
-        g2.drawImage(arregloTiles[3].getImage(), gP.getTileSize() * 3, 0, gP.getTileSize(), gP.getTileSize(), null);
-        g2.drawImage(arregloTiles[4].getImage(), gP.getTileSize() * 4, 0, gP.getTileSize(), gP.getTileSize(), null);
-        g2.drawImage(arregloTiles[5].getImage(), gP.getTileSize() * 5, 0, gP.getTileSize(), gP.getTileSize(), null);
-        */
-    
     }
 
-
-
-
+    public void draw(Graphics2D g2) {
+        int size = gp.getTileSize();
+        for (int ren = 0; ren < gp.getMaxRows(); ren++) {
+            for (int col = 0; col < gp.getMaxCols(); col++) {
+                int tile = this.mapCodeTile[ren][col];
+                g2.drawImage(arregloTiles[tile].getImage(), size * col, size * ren, size, size, null);
+            }
+        }
+    }
 }
