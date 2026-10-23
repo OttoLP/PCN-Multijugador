@@ -24,16 +24,13 @@ public class Jugador extends Entidad {
         this.id = id;
         this.usuario = usuario;
         this.xPantalla = gp.getWidthScreen() / 2 - (gp.getTileSize() / 2);
-        this.yPantalla = gp.getWidthScreen() / 2 - (gp.getTileSize() / 2);
+        this.yPantalla = gp.getHeightScreen() / 2 - (gp.getTileSize() / 2);
         this.hitbox = new Rectangle(8, 16, 32, 32);
-
         configuracionInicial();
         getSpritesJugador();
     }
 
     public void configuracionInicial(){
-        this.xMundo = gp.getTileSize() * 22;
-        this.yMundo = gp.getTileSize() * 39;
         this.x = gp.getWidthScreen() / 2;
         this.y = gp.getHeightScreen() / 2;
         this.velocidad = 4;
@@ -54,7 +51,6 @@ public class Jugador extends Entidad {
             throw new IllegalStateException("No se pudieron cargar los sprites", e);
         }
     }
-
 
     private BufferedImage colorear(BufferedImage imagen) {
 
@@ -94,35 +90,40 @@ public class Jugador extends Entidad {
         y = nuevoY;
     }
 
-    public String getUsuario() { return usuario; }
-
     public void update(){
-        if(mT.getKeyUp() || mT.getKeyDown() || mT.getKeyLeft() || mT.getKeyRight()){
-            this.contadorSprites++;
-        }
+        boolean moviendo = false;
+
         if (mT.getKeyUp()) {
-            this.setY(this.getY() - this.getVelocidad());
-            this.setDireccion("arriba");
+            setDireccion("arriba"); moviendo = true;
         } else if (mT.getKeyDown()) {
-            this.setY(this.getY() + this.getVelocidad());
-            this.setDireccion("abajo");                
+            setDireccion("abajo"); moviendo = true;
         } else if (mT.getKeyLeft()) {
-            this.setX(this.getX() - this.getVelocidad());
-            this.setDireccion   ("izquierda");
+            setDireccion("izquierda"); moviendo = true;
         } else if (mT.getKeyRight()) {
-            this.setX(this.getX() + this.getVelocidad());
-            this.setDireccion("derecha");
+            setDireccion("derecha"); moviendo = true;
         }
-        
-        // Mantener el sprite dentro de la ventana de 26 x 15 tiles.
+
+        if (moviendo) {
+            this.colisionActivada = false;
+            gp.getDetectorColisiones().revisaTile(this);
+
+            if (!this.colisionActivada) {
+                switch (this.direccion) {
+                    case "arriba":    setY(getY() - getVelocidad()); break;
+                    case "abajo":     setY(getY() + getVelocidad()); break;
+                    case "izquierda": setX(getX() - getVelocidad()); break;
+                    case "derecha":   setX(getX() + getVelocidad()); break;
+                }
+            }
+            contadorSprites++;
+        }
+
         x = Math.max(0, Math.min(x, gp.getWidthScreen() - gp.getTileSize()));
         y = Math.max(0, Math.min(y, gp.getHeightScreen() - gp.getTileSize()));
-        if(this.contadorSprites > this.cambiaSprite){
-            if(this.numeroSprites == 1)
-                this.numeroSprites = 2;
-            else
-                this.numeroSprites = 1;
-            this.contadorSprites = 0;
+
+        if (contadorSprites > cambiaSprite) {
+            numeroSprites = (numeroSprites == 1) ? 2 : 1;
+            contadorSprites = 0;
         }
     }
 
@@ -163,19 +164,28 @@ public class Jugador extends Entidad {
         g2.drawString(usuario, x, Math.max(13, y - 3));
         */
     }
-    public int getX(){
-        return this.x;
-    }
-    public int getY(){
-        return this.y;
-    }
-    public int getVelocidad(){
-        return this.velocidad;
-    }
+
+    // Setters
     public void setX(int valor){
         this.x = valor;
     }
-    public void setY(int valor){
-        this.y = valor;
+    public void setY(int valor){ this.y = valor; }
+
+    // Getters
+    public int getX(){
+        return this.x;
     }
+    public int getY(){ return this.y; }
+    public String getUsuario() { return usuario; }
+    public int getVelocidad(){
+        return this.velocidad;
+    }
+    public int getPantallaX(){ return this.xPantalla; }
+    public int getPantallaY(){ return this.yPantalla; }
+    public int getAreaSolidaAncho(){ return this.hitbox.width; }
+    public int getAreaSolidaAlto(){ return this.hitbox.height; }
+    public int getMundoX(){ return this.x; }
+    public int getMundoY(){ return this.y; }
+    public int getAreaSolidaX(){ return this.hitbox.x; }
+    public int getAreaSolidaY(){ return this.hitbox.y; }
 }

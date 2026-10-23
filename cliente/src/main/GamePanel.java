@@ -21,6 +21,7 @@ public class GamePanel extends JPanel implements Runnable {
     KeyManager2 kM = new KeyManager2();
     Jugador[] jugadores = new Jugador[4];
     ManejadorTiles mTi = new ManejadorTiles(this);
+    DetectorColisiones dC = new DetectorColisiones(this);
     Cliente cliente;
     int FPS = 60;
 
@@ -39,10 +40,12 @@ public class GamePanel extends JPanel implements Runnable {
         });
         setFocusable(true);
     }
+
     public void startGameThread() {
         gameThread = new Thread(this, "juego");
         gameThread.start();
     }
+
     @Override
     public void run() {
         while (gameThread != null && cliente.estaConectado()) {
@@ -54,11 +57,11 @@ public class GamePanel extends JPanel implements Runnable {
         gameThread = null;
         repaint();
     }
+
     public void detener() {
         gameThread = null;
         cliente.cerrar();
     }
-
 
     public synchronized void update() {
         Mensaje[] estado = cliente.getJugadores();
@@ -83,6 +86,7 @@ public class GamePanel extends JPanel implements Runnable {
             cliente.enviarPosicion(local.getX(), local.getY());
         }
     }
+
     @Override
     public synchronized void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -99,9 +103,12 @@ public class GamePanel extends JPanel implements Runnable {
         }
         g2.dispose();
     }
+
+    // Getters
     public int getTileSize() { return tileSize; }
     public int getMaxCols() { return maxCols; }
     public int getMaxRows() { return maxRows; }
     public int getWidthScreen() { return widthScreen; }
     public int getHeightScreen() { return heightScreen; }
+    public DetectorColisiones getDetectorColisiones(){ return this.dC; }
 }

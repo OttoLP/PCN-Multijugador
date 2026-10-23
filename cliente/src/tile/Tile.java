@@ -4,17 +4,17 @@ import java.awt.image.BufferedImage;
 
 public class Tile {
     private BufferedImage image;   
-    private boolean collision = false;
+    private boolean colision = false;
 
-    public BufferedImage getImage() {
-        return image;
-    }
-
+    // Setters
     public void setImage(BufferedImage image) {
         this.image = image;
     }
+    public void setColision(boolean valor) { this.colision = valor; }
 
-    public boolean isCollision() {
-        return collision;
+    // Getters
+    public BufferedImage getImage() { return image; }
+    public boolean getColision() {
+        return colision;
     }
 }

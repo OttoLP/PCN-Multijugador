@@ -25,30 +25,29 @@ public class ManejadorTiles {
     
     void getImagenesTile(){
         try{
-
             arregloTiles[0] = new Tile();
             arregloTiles[0].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/agua.png")));
-            //arregloTiles[0].setCollision(false);
+            arregloTiles[0].setColision(false);
 
             arregloTiles[1] = new Tile();
             arregloTiles[1].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/arbol.png")));
-            //arregloTiles[1].setCollision(true);
+            arregloTiles[1].setColision(true);
 
             arregloTiles[2] = new Tile();
             arregloTiles[2].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/arena.png")));
-            //arregloTiles[2].setCollision(true);
+            arregloTiles[2].setColision(false);
 
             arregloTiles[3] = new Tile();
             arregloTiles[3].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/muro.png")));
-            //arregloTiles[3].setCollision(true);
+            arregloTiles[3].setColision(true);
 
             arregloTiles[4] = new Tile();
             arregloTiles[4].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/pasto.png")));
-            //arregloTiles[4].setCollision(true);
+            arregloTiles[4].setColision(false);
 
             arregloTiles[5] = new Tile();
             arregloTiles[5].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/suelo.png")));
-            //arregloTiles[5].setCollision(true); 
+            arregloTiles[5].setColision(false);
 
         }catch(Exception e){
             e.printStackTrace();
@@ -84,5 +83,16 @@ public class ManejadorTiles {
                 g2.drawImage(arregloTiles[tile].getImage(), size * col, size * ren, size, size, null);
             }
         }
+    }
+
+    public int getCodigoMapaTiles(int ren, int col){
+        if (ren < 0 || col < 0 || ren >= mapCodeTile.length || col >= mapCodeTile[0].length) {
+            return 1; // trátalo como sólido (arbol)
+        }
+        return this.mapCodeTile[ren][col];
+    }
+
+    public boolean getColisionDeTile(int index){
+        return this.arregloTiles[index].getColision();
     }
 }
