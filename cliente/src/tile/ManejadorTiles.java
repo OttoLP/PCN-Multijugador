@@ -56,7 +56,7 @@ public class ManejadorTiles {
     }
 
     public void cargarEscenario() {
-        try (InputStream scenario = getClass().getResourceAsStream("/escenarios/mapa.txt")) {
+        try (InputStream scenario = getClass().getResourceAsStream("/escenarios/mundo.txt")) {
             if (scenario == null) {
                 System.err.println("No se encontró /escenarios/map.txt");
                 return;
