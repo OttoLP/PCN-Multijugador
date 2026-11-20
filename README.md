@@ -110,17 +110,24 @@ Solo para desarrollo. Cada usuario puede tener una sola sesión a la vez.
 
 Cada integrante crea los suyos, así nadie pisa la configuración de otro.
 
-## Cambiar el aspecto del mapa
+## Cambiar el aspecto
 
-Los colores del mapa y del monstruo salen de `herramientas/recolorear_tiles.py`, que parte de los originales
-en `herramientas/tiles-originales/` y `sprites-originales/`. Para otro ambiente, cambia `PALETA` y ejecuta
-(requiere `pip install pillow`):
+**Mapa.** Los colores salen de `herramientas/recolorear_tiles.py`, que parte de los originales en
+`herramientas/tiles-originales/`. Para otro ambiente, cambia `PALETA` y ejecuta (requiere `pip install pillow`):
 
 ```bash
 python herramientas/recolorear_tiles.py
 ```
 
 Las propiedades de cada tile (bloquea, pantano, fuente) están en `cliente/src/escenarios/tiles.txt`.
+
+**Jugador (mago).** `cliente/src/spritesjugador/mago.png` es una hoja de 4 × 6 cuadros de 16 × 16 px. Cada fila es una
+dirección, en este orden: abajo, derecha, izquierda y arriba, con 4 cuadros de caminata (el primero es de pie); las
+filas 5 y 6 no se usan todavía. Solo cambia por jugador el azul del sombrero y la túnica (`TUNICAS` en `Jugador.java`:
+rojo, azul, verde y amarillo). Para otro personaje, reemplaza la hoja respetando ese orden y esos tres azules.
+
+**Monstruo (Ocular Watcher).** `cliente/src/spritesmonstruo/monstruo.png` son 4 cuadros de 16 × 16 px en una fila,
+a 200 ms cada uno. El archivo editable está en `herramientas/sprites-originales/OcularWatcher.aseprite`.
 
 ## Documentación
 

@@ -62,7 +62,7 @@ public final class Minimapa {
             }
         }
         if (monstruos != null) {
-            g2.setColor(new Color(215, 90, 235));
+            g2.setColor(new Color(225, 60, 60));
             for (Mensaje monstruo : monstruos) {
                 g2.fillRect(x + (int) (monstruo.x * escala), y + (int) (monstruo.y * escala), 2, 2);
             }
