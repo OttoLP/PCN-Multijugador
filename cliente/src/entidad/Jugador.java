@@ -14,6 +14,11 @@ import main.GamePanel;
 import main.KeyManager2;
 
 public class Jugador extends Entidad {
+    // Color de la camisa de cada jugador (tambien lo usa el minimapa).
+    public static final Color[] COLORES = {new Color(237, 28, 36), new Color(40, 110, 235),
+            new Color(35, 180, 70), new Color(245, 205, 35)};
+    // En un tile lento (pantano) se avanza al 60 %. Igual que Monstruos.PASO_LENTO / PASO en el servidor.
+    private static final double FACTOR_LENTO = 0.6;
     private GamePanel gp;
     private KeyManager2 mT;
     private int id;
@@ -23,7 +28,7 @@ public class Jugador extends Entidad {
     private int vida = 100, vidaMax = 100;
     // Mejoras que decide el servidor. La velocidad tiene decimales y se reparte en pasos enteros.
     private int nivelDanio, nivelVelocidad;
-    private double velocidadReal = 4, restoVelocidad;
+    private double velocidadReal = 10, restoVelocidad;
 
     public Jugador(GamePanel gp, KeyManager2 mT, int id, String usuario){
         this.gp = gp;
@@ -40,7 +45,7 @@ public class Jugador extends Entidad {
     public void configuracionInicial(){
         this.x = gp.getWidthScreen() / 2;
         this.y = gp.getHeightScreen() / 2;
-        this.velocidad = 4;
+        this.velocidad = 10;
         this.setDireccion("abajo");
     }
 
@@ -62,9 +67,7 @@ public class Jugador extends Entidad {
     private BufferedImage colorear(BufferedImage imagen) {
 
         
-        Color[] colores = {new Color(237, 28, 36), new Color(40, 110, 235),
-                new Color(35, 180, 70), new Color(245, 205, 35)};
-        Color color = colores[id];
+        Color color = COLORES[id];
         for (int fila = 7; fila <= 12; fila++) {
             for (int col = 0; col < imagen.getWidth(); col++) {
                 int pixel = imagen.getRGB(col, fila);
@@ -112,7 +115,7 @@ public class Jugador extends Entidad {
 
         if (moviendo) {
             // Con decimales (por ejemplo 4.3) se avanzan 4 px casi todos los cuadros y 5 de vez en cuando.
-            restoVelocidad += velocidadReal;
+            restoVelocidad += enTileLento() ? velocidadReal * FACTOR_LENTO : velocidadReal;
             this.velocidad = (int) restoVelocidad;
             restoVelocidad -= this.velocidad;
             this.colisionActivada = false;
@@ -136,6 +139,13 @@ public class Jugador extends Entidad {
             numeroSprites = (numeroSprites == 1) ? 2 : 1;
             contadorSprites = 0;
         }
+    }
+
+    // true si el centro del jugador esta sobre un tile lento (pantano).
+    private boolean enTileLento() {
+        int size = gp.getTileSize();
+        var tiles = gp.getManejadorTiles();
+        return tiles.getTile(tiles.getCodigoMapaTiles((y + 32) / size, (x + 24) / size)).getLento();
     }
 
     public void draw(Graphics2D g2, int camaraX, int camaraY){

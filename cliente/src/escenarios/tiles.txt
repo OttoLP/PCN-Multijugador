@@ -1,0 +1,22 @@
+# Definicion de los tiles del mundo. La leen el cliente y el servidor: es el unico lugar donde se decide
+# que tile bloquea el paso, ralentiza o cura. Para tiles nuevos, agrega una linea y usa su codigo en mundo.txt.
+#
+# codigo  imagen            bloquea  lento  cura        (1 = si, 0 = no)
+#   imagen: archivo de cliente/src/tiles/. Con @col,fila se toma un tile de 16 x 16 dentro de una hoja de tiles.
+#   lento:  pantano; jugadores y enemigos avanzan mas despacio.
+#   cura:   fuente; el jugador que se para encima recupera vida poco a poco.
+0   agua.png           0        1      0           # pantano
+1   arbol.png          1        0      0
+2   arena.png          0        0      0
+3   muro.png           1        0      0
+4   pasto.png          0        0      0
+5   suelo.png          0        0      0
+6   fuente.png@0,0      0        0      1           # fuente (3 x 3 tiles)
+7   fuente.png@1,0      0        0      1
+8   fuente.png@2,0      0        0      1
+9   fuente.png@0,1      0        0      1
+10  fuente.png@1,1      0        0      1
+11  fuente.png@2,1      0        0      1
+12  fuente.png@0,2      0        0      1
+13  fuente.png@1,2      0        0      1
+14  fuente.png@2,2      0        0      1
