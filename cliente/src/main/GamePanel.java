@@ -9,6 +9,9 @@ import red.Mensaje;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class GamePanel extends JPanel implements Runnable {
     final int originalTileSize = 16;
@@ -29,6 +32,13 @@ public class GamePanel extends JPanel implements Runnable {
     DetectorColisiones dC = new DetectorColisiones(this);
     Cliente cliente;
     int FPS = 60;
+    private volatile boolean menuAudioAbierto = false;
+    private volatile int opcionAudio = 0; // 0 = Musica, 1 = SFX
+    private final Rectangle botonAudio = new Rectangle();
+    private final Rectangle barraMusica = new Rectangle();
+    private final Rectangle barraSfx = new Rectangle();
+    private final Rectangle botonCerrarAudio = new Rectangle();
+    private int arrastrandoBarra = -1;
 
     public GamePanel(Cliente cliente) {
         this.cliente = cliente;
@@ -40,6 +50,20 @@ public class GamePanel extends JPanel implements Runnable {
         setBackground(Color.BLACK);
         setDoubleBuffered(true);
         addKeyListener(kM);
+        kM.setMenuHandlers(this::alternarMenuAudio, this::manejarTeclaMenu);
+        MouseAdapter ratonAudio = new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) {
+                manejarClicAudio(e.getX(), e.getY());
+            }
+            @Override public void mouseDragged(MouseEvent e) {
+                manejarArrastreAudio(e.getX());
+            }
+            @Override public void mouseReleased(MouseEvent e) {
+                arrastrandoBarra = -1;
+            }
+        };
+        addMouseListener(ratonAudio);
+        addMouseMotionListener(ratonAudio);
         addFocusListener(new FocusAdapter() {
             @Override public void focusLost(FocusEvent e) { kM.soltarTeclas(); }
         });
@@ -49,6 +73,7 @@ public class GamePanel extends JPanel implements Runnable {
     public void startGameThread() {
         gameThread = new Thread(this, "juego");
         gameThread.start();
+        Sonido.iniciarMusica("/sonidos/musica1.wav", "/sonidos/musica2.wav");
     }
 
     @Override
@@ -65,6 +90,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void detener() {
         gameThread = null;
+        Sonido.detenerMusica();
         cliente.cerrar();
     }
 
@@ -104,6 +130,10 @@ public class GamePanel extends JPanel implements Runnable {
             local.setY(correccion.y);
         }
         if (local.isMuerto()) return; // un jugador caido ya no se mueve
+        if (menuAudioAbierto) return;
+        if (cliente.esModoLocal() && kM.getKeyAttack() && !local.estaAtacando()) {
+            local.iniciarAtaque();
+        }
         int antesX = local.getX(), antesY = local.getY();
         local.update();
         if (monstruo.choca(local.getX(), local.getY(), monstruos)) {
@@ -149,6 +179,7 @@ public class GamePanel extends JPanel implements Runnable {
             if (disparo.jugador() < 0 || disparo.jugador() >= jugadores.length) continue;
             Jugador origen = jugadores[disparo.jugador()];
             if (origen == null) continue;
+            origen.iniciarAtaque();
             g2.drawLine(origen.getX() + mitad - camaraX, origen.getY() + mitad - camaraY,
                     disparo.x() + mitad - camaraX, disparo.y() + mitad - camaraY);
         }
@@ -185,6 +216,135 @@ public class GamePanel extends JPanel implements Runnable {
         } else if (local.isMuerto()) {
             mensajeCentral(g2, "HAS CAIDO", "La partida se reinicia cuando todos caigan.");
         }
+        dibujaBotonAudio(g2);
+        if (menuAudioAbierto) dibujaMenuAudio(g2);
+    }
+
+    private void alternarMenuAudio() {
+        menuAudioAbierto = !menuAudioAbierto;
+        arrastrandoBarra = -1;
+        kM.soltarTeclas();
+        repaint();
+    }
+
+    private void manejarTeclaMenu(int code) {
+        if (!menuAudioAbierto) return;
+        switch (code) {
+            case KeyEvent.VK_UP, KeyEvent.VK_W -> opcionAudio = 0;
+            case KeyEvent.VK_DOWN, KeyEvent.VK_S -> opcionAudio = 1;
+            case KeyEvent.VK_LEFT, KeyEvent.VK_A -> ajustarVolumenActual(-5);
+            case KeyEvent.VK_RIGHT, KeyEvent.VK_D -> ajustarVolumenActual(5);
+        }
+        repaint();
+    }
+
+    private void ajustarVolumenActual(int delta) {
+        if (opcionAudio == 0) {
+            Sonido.setVolumenMusica(Sonido.getVolumenMusica() + delta);
+        } else {
+            Sonido.setVolumenSfx(Sonido.getVolumenSfx() + delta);
+        }
+    }
+
+    private void manejarClicAudio(int x, int y) {
+        if (botonAudio.contains(x, y)) {
+            alternarMenuAudio();
+            return;
+        }
+        if (!menuAudioAbierto) return;
+        if (botonCerrarAudio.contains(x, y)) {
+            alternarMenuAudio();
+            return;
+        }
+        if (barraMusica.contains(x, y)) {
+            opcionAudio = 0;
+            arrastrandoBarra = 0;
+            actualizarBarraDesdeX(barraMusica, x, true);
+        } else if (barraSfx.contains(x, y)) {
+            opcionAudio = 1;
+            arrastrandoBarra = 1;
+            actualizarBarraDesdeX(barraSfx, x, false);
+        }
+    }
+
+    private void manejarArrastreAudio(int x) {
+        if (!menuAudioAbierto || arrastrandoBarra < 0) return;
+        if (arrastrandoBarra == 0) actualizarBarraDesdeX(barraMusica, x, true);
+        else actualizarBarraDesdeX(barraSfx, x, false);
+    }
+
+    private void actualizarBarraDesdeX(Rectangle barra, int x, boolean esMusica) {
+        int pct = (int) Math.round(((x - barra.x) * 100.0) / Math.max(1, barra.width));
+        if (esMusica) Sonido.setVolumenMusica(pct);
+        else Sonido.setVolumenSfx(pct);
+        repaint();
+    }
+
+    private void dibujaBotonAudio(Graphics2D g2) {
+        String label = "Audio (ESC)";
+        g2.setFont(new Font("SansSerif", Font.BOLD, 13));
+        int w = g2.getFontMetrics().stringWidth(label) + 20;
+        int h = 28;
+        int x = widthScreen - w - 16;
+        int y = 14;
+        botonAudio.setBounds(x, y, w, h);
+        g2.setColor(new Color(20, 20, 20, 200));
+        g2.fillRoundRect(x, y, w, h, 8, 8);
+        g2.setColor(menuAudioAbierto ? new Color(255, 220, 120) : new Color(180, 180, 180));
+        g2.drawRoundRect(x, y, w, h, 8, 8);
+        g2.setColor(Color.WHITE);
+        g2.drawString(label, x + 10, y + 19);
+    }
+
+    private void dibujaMenuAudio(Graphics2D g2) {
+        g2.setColor(new Color(0, 0, 0, 140));
+        g2.fillRect(0, 0, widthScreen, heightScreen);
+
+        int panelW = 360, panelH = 220;
+        int px = (widthScreen - panelW) / 2;
+        int py = (heightScreen - panelH) / 2;
+
+        g2.setColor(new Color(28, 30, 38, 240));
+        g2.fillRoundRect(px, py, panelW, panelH, 14, 14);
+        g2.setColor(new Color(120, 130, 150));
+        g2.drawRoundRect(px, py, panelW, panelH, 14, 14);
+
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("SansSerif", Font.BOLD, 20));
+        g2.drawString("AUDIO", px + 24, py + 34);
+
+        dibujaSlider(g2, px + 24, py + 58, panelW - 48, "Musica", Sonido.getVolumenMusica(), opcionAudio == 0, barraMusica);
+        dibujaSlider(g2, px + 24, py + 114, panelW - 48, "Efectos (SFX)", Sonido.getVolumenSfx(), opcionAudio == 1, barraSfx);
+
+        int btnW = 100, btnH = 30;
+        int bx = px + panelW - btnW - 24;
+        int by = py + panelH - btnH - 18;
+        botonCerrarAudio.setBounds(bx, by, btnW, btnH);
+        g2.setColor(new Color(65, 75, 95));
+        g2.fillRoundRect(bx, by, btnW, btnH, 8, 8);
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("SansSerif", Font.BOLD, 13));
+        g2.drawString("Cerrar (ESC)", bx + 11, by + 20);
+
+        g2.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        g2.setColor(new Color(180, 185, 200));
+        g2.drawString("Flechas/WASD o clic para ajustar", px + 24, by + 20);
+    }
+
+    private void dibujaSlider(Graphics2D g2, int x, int y, int ancho, String etiqueta, int valor, boolean activo, Rectangle destino) {
+        g2.setFont(new Font("SansSerif", Font.BOLD, 14));
+        g2.setColor(activo ? new Color(255, 225, 130) : Color.WHITE);
+        g2.drawString((activo ? "> " : "  ") + etiqueta + ": " + valor + "%", x, y + 14);
+
+        int barY = y + 22;
+        int barH = 14;
+        destino.setBounds(x, barY, ancho, barH);
+        g2.setColor(new Color(55, 60, 72));
+        g2.fillRoundRect(x, barY, ancho, barH, 6, 6);
+        g2.setColor(activo ? new Color(230, 170, 60) : new Color(90, 160, 230));
+        g2.fillRoundRect(x, barY, ancho * valor / 100, barH, 6, 6);
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(x, barY, ancho, barH, 6, 6);
     }
 
     // Numero de oleada y enemigos que faltan, o cuenta regresiva del descanso (arriba al centro).

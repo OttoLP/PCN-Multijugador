@@ -4,7 +4,14 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 
 public class KeyManager2 implements KeyListener {
-    private volatile boolean keyUp, keyDown, keyLeft, keyRigth;
+    private volatile boolean keyUp, keyDown, keyLeft, keyRigth, keyAttack;
+    private volatile Runnable onToggleMenu;
+    private volatile java.util.function.IntConsumer onMenuKey;
+
+    public void setMenuHandlers(Runnable onToggleMenu, java.util.function.IntConsumer onMenuKey) {
+        this.onToggleMenu = onToggleMenu;
+        this.onMenuKey = onMenuKey;
+    }
 
     @Override
     public void keyTyped(KeyEvent e){
@@ -13,7 +20,17 @@ public class KeyManager2 implements KeyListener {
 
     @Override
     public void keyPressed(KeyEvent e){
-        switch(e.getKeyCode()){
+        int code = e.getKeyCode();
+        if (code == KeyEvent.VK_ESCAPE) {
+            Runnable toggle = onToggleMenu;
+            if (toggle != null) toggle.run();
+            return;
+        }
+        java.util.function.IntConsumer menuHandler = onMenuKey;
+        if (menuHandler != null) {
+            menuHandler.accept(code);
+        }
+        switch(code){
             case KeyEvent.VK_W:
                 keyUp = true;
             break;
@@ -25,6 +42,9 @@ public class KeyManager2 implements KeyListener {
                 break;
             case KeyEvent.VK_D:
                 keyRigth = true;
+                break;
+            case KeyEvent.VK_SPACE:
+                keyAttack = true;
                 break;
         }
     }
@@ -44,11 +64,14 @@ public class KeyManager2 implements KeyListener {
             case KeyEvent.VK_D:
                 keyRigth = false;
                 break;
+            case KeyEvent.VK_SPACE:
+                keyAttack = false;
+                break;
         }
     }
 
     public void soltarTeclas() {
-        keyUp = keyDown = keyLeft = keyRigth = false;
+        keyUp = keyDown = keyLeft = keyRigth = keyAttack = false;
     }
 
     public boolean getKeyUp(){
@@ -65,5 +88,9 @@ public class KeyManager2 implements KeyListener {
 
     public boolean getKeyRight(){
         return this.keyRigth;
+    }
+
+    public boolean getKeyAttack(){
+        return this.keyAttack;
     }
 }

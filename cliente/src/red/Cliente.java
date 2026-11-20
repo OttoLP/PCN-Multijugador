@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class Cliente {
     private final Socket socket;
+    private final boolean modoLocal;
     private BufferedReader entrada;
     private BufferedWriter salida;
     private volatile boolean conectado;
@@ -28,6 +29,60 @@ public class Cliente {
     // La conexion ya fue abierta por ConexionServidor.
     public Cliente(Socket socket) {
         this.socket = socket;
+        this.modoLocal = false;
+    }
+
+    private Cliente() {
+        this.socket = null;
+        this.modoLocal = true;
+    }
+
+    /** Crea un cliente sin servidor para probar sprites, tiles y sonidos localmente. */
+    public static Cliente modoLocal() {
+        Cliente local = new Cliente();
+        local.id = 0;
+        local.x = 100;
+        local.y = 100;
+        local.usuario = "Local";
+        local.conectado = true;
+
+        Mensaje estadoInicial = new Mensaje("posiciones");
+        estadoInicial.oleada = 1;
+        estadoInicial.restantes = 2;
+        estadoInicial.jugadores = new Mensaje[4];
+        estadoInicial.jugadores[0] = crearJugadorLocal(0, local.usuario, local.x, local.y);
+        estadoInicial.jugadores[1] = crearJugadorLocal(1, "Bot2", 164, 100);
+        estadoInicial.jugadores[2] = crearJugadorLocal(2, "Bot3", 228, 100);
+        estadoInicial.jugadores[3] = crearJugadorLocal(3, "Bot4", 292, 100);
+
+        Mensaje m1 = new Mensaje();
+        m1.x = 288;
+        m1.y = 192;
+        m1.vida = 30;
+        m1.vidaMax = 30;
+        Mensaje m2 = new Mensaje();
+        m2.x = 384;
+        m2.y = 240;
+        m2.vida = 20;
+        m2.vidaMax = 30;
+        estadoInicial.monstruos = new Mensaje[] { m1, m2 };
+
+        local.estado = estadoInicial;
+        return local;
+    }
+
+    private static Mensaje crearJugadorLocal(int id, String usuario, int x, int y) {
+        Mensaje jugador = new Mensaje();
+        jugador.id = id;
+        jugador.usuario = usuario;
+        jugador.x = x;
+        jugador.y = y;
+        jugador.vida = 100;
+        jugador.vidaMax = 100;
+        jugador.nivelDanio = 0;
+        jugador.nivelVelocidad = 0;
+        jugador.velocidad = 4.0;
+        return jugador;
     }
 
     public void autenticar() throws IOException {
@@ -101,6 +156,15 @@ public class Cliente {
     }
 
     public void enviarPosicion(int x, int y) {
+        if (modoLocal) {
+            this.x = x;
+            this.y = y;
+            if (estado.jugadores != null && estado.jugadores[0] != null) {
+                estado.jugadores[0].x = x;
+                estado.jugadores[0].y = y;
+            }
+            return;
+        }
         Mensaje mensaje = new Mensaje("posiciones");
         mensaje.x = x;
         mensaje.y = y;
@@ -119,6 +183,7 @@ public class Cliente {
         conectado = false;
         if (socket != null) try { socket.close(); } catch (IOException ignored) {}
     }
+    public boolean esModoLocal() { return modoLocal; }
     public boolean estaConectado() { return conectado; }
     public Mensaje getEstado() { return estado; }
     public Mensaje tomarCorreccion() { return correccion.getAndSet(null); }

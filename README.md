@@ -108,6 +108,18 @@ Solo para desarrollo. Cada usuario puede tener una sola sesión a la vez.
 
 Cada integrante crea los suyos, así nadie pisa la configuración de otro.
 
+## Compilación y pruebas
+
+- **Cliente (`cliente/`):** Compila directamente con `javac` (probado con OpenJDK 27.0.1 y `cliente/lib/gson-2.14.0.jar`):
+  ```bash
+  javac -encoding UTF-8 -sourcepath cliente/src -cp "cliente/lib/*" -d cliente/build cliente/src/main/Game.java
+  ```
+- **Servidor (`servidor/`):** Proyecto Maven ([`servidor/pom.xml`](servidor/pom.xml)) configurado para Java 17 con `mysql-connector-j:9.7.0` y `gson:2.14.0`:
+  ```bash
+  cd servidor && mvn compile
+  ```
+- **Pruebas:** Actualmente no hay pruebas unitarias ni de integración en `servidor/` ni en `cliente/`.
+
 ## Documentación
 
 - [Instalación y ejecución](docs/INSTALACION.md)
