@@ -28,7 +28,7 @@ public class Jugador extends Entidad {
     private int vida = 100, vidaMax = 100;
     // Mejoras que decide el servidor. La velocidad tiene decimales y se reparte en pasos enteros.
     private int nivelDanio, nivelVelocidad;
-    private double velocidadReal = 10, restoVelocidad;
+    private double velocidadReal = 4, restoVelocidad;
 
     public Jugador(GamePanel gp, KeyManager2 mT, int id, String usuario){
         this.gp = gp;
@@ -45,7 +45,7 @@ public class Jugador extends Entidad {
     public void configuracionInicial(){
         this.x = gp.getWidthScreen() / 2;
         this.y = gp.getHeightScreen() / 2;
-        this.velocidad = 10;
+        this.velocidad = 4;
         this.setDireccion("abajo");
     }
 
