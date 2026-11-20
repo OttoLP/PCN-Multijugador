@@ -6,6 +6,7 @@ import java.awt.Composite;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.awt.Rectangle;
 
 import javax.imageio.ImageIO;
@@ -14,6 +15,29 @@ import main.GamePanel;
 import main.KeyManager2;
 
 public class Jugador extends Entidad {
+    // Color de la camisa de cada jugador (tambien lo usa el minimapa).
+    public static final Color[] COLORES = {new Color(237, 28, 36), new Color(40, 110, 235),
+            new Color(35, 180, 70), new Color(245, 205, 35)};
+    // En un tile lento (pantano) se avanza al 60 %. Igual que Monstruos.PASO_LENTO / PASO en el servidor.
+    private static final double FACTOR_LENTO = 0.6;
+    // Hoja del mago (spritesjugador/mago.png): cuadros de 16 x 16, 4 por fila (animacion de caminata, el
+    // primero es de pie). Cada fila es una direccion, en este orden: abajo, derecha, izquierda, arriba.
+    // Las filas 5 y 6 de la hoja todavia no se usan.
+    private static final int TAM_CUADRO = 16;
+    private static final int CUADROS = 4;
+    private static final String[] DIRECCIONES = {"abajo", "derecha", "izquierda", "arriba"};
+    // Solo cambia el azul del sombrero y la tunica (claro, medio y oscuro); lo demas queda como en la hoja.
+    private static final int[] AZULES = {0xFF284884, 0xFF273E6F, 0xFF19264E};
+    // Sombrero y tunica de cada jugador: rojo, azul, verde y amarillo (claro, medio y oscuro).
+    private static final int[][] TUNICAS = {
+            {0xFFAC343C, 0xFF903339, 0xFF652125},   // rojo
+            {0xFF284884, 0xFF273E6F, 0xFF19264E},   // azul, el original de la hoja
+            {0xFF2F8B46, 0xFF2D753F, 0xFF1D522A},   // verde
+            {0xFFCDB053, 0xFFAC964D, 0xFF796933},   // amarillo
+    };
+    // Animacion de los otros jugadores: tiempo entre cuadros y cuanto sin moverse para pasar a "de pie".
+    private static final long MS_POR_CUADRO = 115;
+    private static final long MS_PARA_REPOSO = 200;
     private GamePanel gp;
     private KeyManager2 mT;
     private int id;
@@ -24,6 +48,9 @@ public class Jugador extends Entidad {
     // Mejoras que decide el servidor. La velocidad tiene decimales y se reparte en pasos enteros.
     private int nivelDanio, nivelVelocidad;
     private double velocidadReal = 4, restoVelocidad;
+    private final BufferedImage[][] cuadros = new BufferedImage[DIRECCIONES.length][CUADROS];
+    private boolean remoto;            // los otros jugadores se animan con lo que reciben del servidor
+    private long ultimoMovimiento, ultimoCuadro;
 
     public Jugador(GamePanel gp, KeyManager2 mT, int id, String usuario){
         this.gp = gp;
@@ -45,39 +72,42 @@ public class Jugador extends Entidad {
     }
 
     public void getSpritesJugador(){
-        try{
-            this.arriba1 = colorear(ImageIO.read(getClass().getResourceAsStream("/spritesjugador/moverArriba1.png")));
-            this.arriba2 = colorear(ImageIO.read(getClass().getResourceAsStream("/spritesjugador/moverArriba2.png")));
-            this.abajo1 = colorear(ImageIO.read(getClass().getResourceAsStream("/spritesjugador/moverAbajo1.png")));
-            this.abajo2 = colorear(ImageIO.read(getClass().getResourceAsStream("/spritesjugador/moverAbajo2.png")));
-            this.izquierda1 = colorear(ImageIO.read(getClass().getResourceAsStream("/spritesjugador/moverIzquierda1.png")));
-            this.izquierda2 = colorear(ImageIO.read(getClass().getResourceAsStream("/spritesjugador/moverIzquierda2.png")));
-            this.derecha1 = colorear(ImageIO.read(getClass().getResourceAsStream("/spritesjugador/moverDerecha1.png")));
-            this.derecha2 = colorear(ImageIO.read(getClass().getResourceAsStream("/spritesjugador/moverDerecha2.png")));
+        try (InputStream recurso = getClass().getResourceAsStream("/spritesjugador/mago.png")) {
+            if (recurso == null) throw new IOException("Falta spritesjugador/mago.png");
+            BufferedImage hoja = colorear(ImageIO.read(recurso));
+            for (int fila = 0; fila < DIRECCIONES.length; fila++) {
+                for (int col = 0; col < CUADROS; col++) {
+                    cuadros[fila][col] = hoja.getSubimage(col * TAM_CUADRO, fila * TAM_CUADRO, TAM_CUADRO, TAM_CUADRO);
+                }
+            }
         }catch(IOException e){
             throw new IllegalStateException("No se pudieron cargar los sprites", e);
         }
     }
 
-    private BufferedImage colorear(BufferedImage imagen) {
-
-        
-        Color[] colores = {new Color(237, 28, 36), new Color(40, 110, 235),
-                new Color(35, 180, 70), new Color(245, 205, 35)};
-        Color color = colores[id];
-        for (int fila = 7; fila <= 12; fila++) {
-            for (int col = 0; col < imagen.getWidth(); col++) {
-                int pixel = imagen.getRGB(col, fila);
-                boolean claro = pixel == 0xFFED1C24;
-                boolean oscuro = pixel == 0xFF880015;
-                // En las vistas de espalda, fila 7 aun tiene pelo en el centro.
-                if (fila == 7 && col >= 4 && col <= 11) continue;
-                if (claro || oscuro) {
-                    imagen.setRGB(col, fila, (oscuro ? color.darker() : color).getRGB());
+    // Copia la hoja cambiando solo los tres azules del sombrero y la tunica por los de este jugador.
+    private BufferedImage colorear(BufferedImage hoja) {
+        BufferedImage copia = new BufferedImage(hoja.getWidth(), hoja.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        for (int fila = 0; fila < hoja.getHeight(); fila++) {
+            for (int col = 0; col < hoja.getWidth(); col++) {
+                int pixel = hoja.getRGB(col, fila);
+                for (int k = 0; k < AZULES.length; k++) {
+                    if (pixel == AZULES[k]) {
+                        pixel = TUNICAS[id][k];
+                        break;
+                    }
                 }
+                copia.setRGB(col, fila, pixel);
             }
         }
-        return imagen;
+        return copia;
+    }
+
+    private int filaDeDireccion() {
+        for (int i = 0; i < DIRECCIONES.length; i++) {
+            if (DIRECCIONES[i].equals(direccion)) return i;
+        }
+        return 0;
     }
 
     // Los otros jugadores deducen direccion y animacion a partir del desplazamiento.
@@ -87,10 +117,12 @@ public class Jugador extends Entidad {
         else if (nuevoX < x) setDireccion("izquierda");
         else if (nuevoX > x) setDireccion("derecha");
         if (nuevoX != x || nuevoY != y) {
-            contadorSprites++;
-            if (contadorSprites > cambiaSprite) {
-                numeroSprites = numeroSprites == 1 ? 2 : 1;
-                contadorSprites = 0;
+            long ahora = System.currentTimeMillis();
+            remoto = true;
+            ultimoMovimiento = ahora;
+            if (ahora - ultimoCuadro >= MS_POR_CUADRO) {
+                cuadroActual = (cuadroActual + 1) % CUADROS;
+                ultimoCuadro = ahora;
             }
         }
         x = nuevoX;
@@ -112,7 +144,7 @@ public class Jugador extends Entidad {
 
         if (moviendo) {
             // Con decimales (por ejemplo 4.3) se avanzan 4 px casi todos los cuadros y 5 de vez en cuando.
-            restoVelocidad += velocidadReal;
+            restoVelocidad += enTileLento() ? velocidadReal * FACTOR_LENTO : velocidadReal;
             this.velocidad = (int) restoVelocidad;
             restoVelocidad -= this.velocidad;
             this.colisionActivada = false;
@@ -127,45 +159,32 @@ public class Jugador extends Entidad {
                 }
             }
             contadorSprites++;
+        } else {
+            // Quieto: primer cuadro de la hoja (de pie).
+            contadorSprites = 0;
+            cuadroActual = 0;
         }
 
         x = Math.max(0, Math.min(x, gp.getWidthWorld() - gp.getTileSize()));
         y = Math.max(0, Math.min(y, gp.getHeightWorld() - gp.getTileSize()));
 
         if (contadorSprites > cambiaSprite) {
-            numeroSprites = (numeroSprites == 1) ? 2 : 1;
+            cuadroActual = (cuadroActual + 1) % CUADROS;
             contadorSprites = 0;
         }
     }
 
+    // true si el centro del jugador esta sobre un tile lento (pantano).
+    private boolean enTileLento() {
+        int size = gp.getTileSize();
+        var tiles = gp.getManejadorTiles();
+        return tiles.getTile(tiles.getCodigoMapaTiles((y + 32) / size, (x + 24) / size)).getLento();
+    }
+
     public void draw(Graphics2D g2, int camaraX, int camaraY){
-        BufferedImage sprite = null;
-        switch (this.getDireccion()) {
-            case "arriba":
-                if(this.numeroSprites == 1)
-                    sprite = this.arriba1;
-                if (this.numeroSprites == 2)
-                    sprite = this.arriba2;
-            break;
-            case "abajo":
-                if(this.numeroSprites == 1)
-                    sprite = this.abajo1;
-                if (this.numeroSprites == 2)
-                    sprite = this.abajo2;
-            break;
-            case "izquierda":
-                if(this.numeroSprites == 1)
-                    sprite = this.izquierda1;
-                if (this.numeroSprites == 2)
-                    sprite = this.izquierda2;
-            break;
-            case "derecha":
-                if(this.numeroSprites == 1)
-                    sprite = this.derecha1;
-                if (this.numeroSprites == 2)
-                    sprite = this.derecha2;
-            break;
-        }
+        // Un jugador remoto que dejo de moverse se muestra de pie.
+        int cuadro = (remoto && System.currentTimeMillis() - ultimoMovimiento > MS_PARA_REPOSO) ? 0 : cuadroActual;
+        BufferedImage sprite = cuadros[filaDeDireccion()][cuadro];
         int pantallaX = getX() - camaraX;
         int pantallaY = getY() - camaraY;
         // Un jugador caido se ve casi transparente y sin barra de vida.

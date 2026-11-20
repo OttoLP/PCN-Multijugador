@@ -11,6 +11,7 @@
                 <directory>${project.basedir}/../cliente/src</directory>
                 <includes>
                     <include>escenarios/mundo.txt</include>
+                    <include>escenarios/tiles.txt</include>
                 </includes>
             </resource>
         </resources>

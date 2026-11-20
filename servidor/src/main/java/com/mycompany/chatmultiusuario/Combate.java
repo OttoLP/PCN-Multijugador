@@ -39,9 +39,24 @@ final class Combate {
     // Si cayo durante la oleada, antes pierde la ultima que habia ganado.
     static final boolean AMBAS_MEJORAS = false;   // true: cada oleada sube daño y velocidad a la vez
     static final int DANIO_POR_NIVEL = 2;         // se suma a DANIO_ATAQUE
-    static final double VELOCIDAD_BASE = 4.0;     // pixeles por cuadro (igual que el cliente)
+    static final double VELOCIDAD_BASE = 5.5;     // pixeles por cuadro (igual que el cliente)
     static final double VELOCIDAD_POR_NIVEL = 0.3;
-    static final int MAX_NIVEL_VELOCIDAD = 8;
+    static final int MAX_NIVEL_VELOCIDAD = 10;
+
+    // Mapa interactivo
+    static final int CURA_FUENTE_POR_SEGUNDO = 6; // vida que recupera quien esta sobre la fuente
+    static final int BARRILES = 12;               // maximo de barriles; se reponen solo durante el descanso
+    static final long REPOSICION_BARRIL_MS = 1000; // un barril nuevo por segundo
+    static final int VIDA_BARRIL = 20;
+    // Al romper un barril suelta (porcentajes; lo que falta para 100 es "nada"):
+    static final int PROBABILIDAD_CORAZON = 55;
+    static final int PROBABILIDAD_FURIA = 20;
+    static final int PROBABILIDAD_RAPIDEZ = 20;
+    static final long OBJETO_VIDA_MS = 20000;     // un objeto suelto desaparece si nadie lo toma
+    static final int CURA_CORAZON = 25;           // el corazon solo se recoge si falta vida
+    static final long BONUS_MS = 10000;           // duracion de furia y rapidez
+    static final double FACTOR_FURIA = 1.5;       // multiplica el daño del ataque
+    static final double FACTOR_RAPIDEZ = 1.4;     // multiplica la velocidad de movimiento
 
     // Cuando todos los jugadores caen, la partida se reinicia sola
     static final long REINICIO_MS = 8000;

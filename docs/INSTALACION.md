@@ -100,7 +100,9 @@ La clase principal es `main.Game`.
 
 ## 4. Qué esperar
 
-- El primer jugador aparece en `(100, 100)` y los siguientes se separan 96 píxeles.
+- Los jugadores aparecen en el centro del mapa, sobre el camino junto a la fuente, uno al lado del otro.
+- Durante el descanso aparecen barriles de a uno por segundo (hasta 12); el ataque automático los rompe y suelta objetos.
+- El minimapa está en la esquina inferior derecha; el cuadro blanco es lo que ves en pantalla.
 - Los colores se asignan por el primer lugar libre: rojo, azul, verde y amarillo.
 - Al cerrar una ventana se libera su lugar.
 - El quinto jugador recibe `Sala llena: maximo 4 jugadores.`

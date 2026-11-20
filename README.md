@@ -40,12 +40,14 @@ flowchart LR
 │   └── src/main/java/com/mycompany/chatmultiusuario/
 ├── cliente/                Juego Swing, se ejecuta sin Maven en el host
 │   ├── src/                main, entidad, tile, red + sprites y tiles
+│   │   └── escenarios/     mundo.txt (el mapa) y tiles.txt (qué hace cada tile)
 │   ├── lib/gson-2.14.0.jar
 │   ├── cliente.properties          usuario y contraseña del jugador
 │   ├── config/Jugador1..4.properties
 │   ├── servidor.properties.example → copiar como servidor.properties
 │   └── ejecutar.sh / ejecutar.bat
 ├── database/usuarios.sql   Crea la tabla y las 4 cuentas de prueba
+├── herramientas/           Script para recolorear los tiles y sus originales
 ├── docs/                   Instalación, protocolo e historial de entregas
 ├── CONTRIBUTING.md         Cómo trabajar en equipo
 └── .github/                Plantillas de Pull Request e Issues
@@ -108,6 +110,25 @@ Solo para desarrollo. Cada usuario puede tener una sola sesión a la vez.
 
 Cada integrante crea los suyos, así nadie pisa la configuración de otro.
 
+## Cambiar el aspecto
+
+**Mapa.** Los colores salen de `herramientas/recolorear_tiles.py`, que parte de los originales en
+`herramientas/tiles-originales/`. Para otro ambiente, cambia `PALETA` y ejecuta (requiere `pip install pillow`):
+
+```bash
+python herramientas/recolorear_tiles.py
+```
+
+Las propiedades de cada tile (bloquea, pantano, fuente) están en `cliente/src/escenarios/tiles.txt`.
+
+**Jugador (mago).** `cliente/src/spritesjugador/mago.png` es una hoja de 4 × 6 cuadros de 16 × 16 px. Cada fila es una
+dirección, en este orden: abajo, derecha, izquierda y arriba, con 4 cuadros de caminata (el primero es de pie); las
+filas 5 y 6 no se usan todavía. Solo cambia por jugador el azul del sombrero y la túnica (`TUNICAS` en `Jugador.java`:
+rojo, azul, verde y amarillo). Para otro personaje, reemplaza la hoja respetando ese orden y esos tres azules.
+
+**Monstruo (Ocular Watcher).** `cliente/src/spritesmonstruo/monstruo.png` son 4 cuadros de 16 × 16 px en una fila,
+a 200 ms cada uno. El archivo editable está en `herramientas/sprites-originales/OcularWatcher.aseprite`.
+
 ## Documentación
 
 - [Instalación y ejecución](docs/INSTALACION.md)
@@ -119,7 +140,7 @@ Cada integrante crea los suyos, así nadie pisa la configuración de otro.
 
 - Las contraseñas están en texto plano en la base de datos y los sockets no usan TLS.
 - El servidor confía en el movimiento que calcula el cliente; solo valida los límites del mundo. La vida, el daño y los monstruos sí los decide el servidor.
-- Los monstruos persiguen en línea recta y se atoran con árboles y muros, y todos son del mismo tipo. Sin reconexión automática.
+- Todos los monstruos son del mismo tipo, y los barriles y objetos sueltos no bloquean el paso. Sin reconexión automática.
 - Quien entra a la mitad de una partida empieza sin mejoras, aunque los demás ya tengan varias.
 - No hay chat de texto en esta versión.
 

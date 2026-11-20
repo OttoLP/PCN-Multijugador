@@ -1,19 +1,18 @@
 package com.mycompany.chatmultiusuario;
 
 import java.awt.Rectangle;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 import java.util.concurrent.ThreadLocalRandom;
 
 final class Monstruos {
-    private static final int TILE = 48;
-    private static final int CUERPO = 36;
+    private static final int TILE = Mapa.TILE;
+    private static final int CUERPO = Mapa.CUERPO;
     private static final int CONTACTO = 8;   // margen alrededor del jugador para contar un golpe
     private static final int PASO = 5;
-    private final int[][] mapa = new int[50][50];
+    private static final int PASO_LENTO = 3;   // en el pantano avanzan al 60 %
+    private final Mapa mapa;
+    private final int[][] distancia;   // tiles hasta el jugador vivo mas cercano (se recalcula cada ciclo)
 
     private static final class Enemigo {
         final Rectangle cuerpo;
@@ -30,14 +29,9 @@ final class Monstruos {
     // Solo hay enemigos vivos: al morir se quitan de la lista.
     private final List<Enemigo> enemigos = new ArrayList<>();
 
-    Monstruos() {
-        InputStream recurso = getClass().getResourceAsStream("/escenarios/mundo.txt");
-        if (recurso == null) throw new IllegalStateException("Falta escenarios/mundo.txt");
-        try (Scanner lector = new Scanner(recurso, StandardCharsets.UTF_8)) {
-            for (int[] fila : mapa) {
-                for (int col = 0; col < fila.length; col++) fila[col] = lector.nextInt();
-            }
-        }
+    Monstruos(Mapa mapa) {
+        this.mapa = mapa;
+        this.distancia = new int[mapa.filas()][mapa.columnas()];
     }
 
     void reiniciar() {
@@ -49,29 +43,76 @@ final class Monstruos {
     }
 
     // jugadores: solo los que estan vivos (los caidos no atraen ni estorban).
+    // Los monstruos siguen el camino mas corto por tiles libres hasta el jugador mas cercano,
+    // asi rodean muros y arboles en lugar de atorarse con ellos.
     boolean update(Mensaje[] jugadores) {
+        int[] filasOrigen = new int[jugadores.length];
+        int[] colsOrigen = new int[jugadores.length];
+        int cantidad = 0;
+        for (Mensaje jugador : jugadores) {
+            if (jugador == null) continue;
+            filasOrigen[cantidad] = (jugador.y + CUERPO / 2) / TILE;
+            colsOrigen[cantidad] = (jugador.x + CUERPO / 2) / TILE;
+            cantidad++;
+        }
+        if (cantidad == 0) return false;
+        mapa.calcularDistancias(filasOrigen, colsOrigen, cantidad, distancia);
+
         boolean cambio = false;
         for (Enemigo enemigo : enemigos) {
             Rectangle monstruo = enemigo.cuerpo;
-            Mensaje objetivo = null;
-            int menorDistancia = Integer.MAX_VALUE;
-            for (Mensaje jugador : jugadores) {
-                if (jugador == null) continue;
-                int dx = jugador.x - monstruo.x;
-                int dy = jugador.y - monstruo.y;
-                int distancia = dx * dx + dy * dy;
-                if (distancia < menorDistancia) {
-                    menorDistancia = distancia;
-                    objetivo = jugador;
-                }
-            }
-            if (objetivo == null) continue;
-            int dx = Math.max(-PASO, Math.min(PASO, objetivo.x - monstruo.x));
-            int dy = Math.max(-PASO, Math.min(PASO, objetivo.y - monstruo.y));
+            int[] destino = destino(monstruo, jugadores);
+            int paso = mapa.lento(filaCentro(monstruo), colCentro(monstruo)) ? PASO_LENTO : PASO;
+            int dx = Math.max(-paso, Math.min(paso, destino[0] - monstruo.x));
+            int dy = Math.max(-paso, Math.min(paso, destino[1] - monstruo.y));
             cambio |= mover(enemigo, dx, 0, jugadores);
             cambio |= mover(enemigo, 0, dy, jugadores);
         }
         return cambio;
+    }
+
+    private int filaCentro(Rectangle cuerpo) { return (cuerpo.y + CUERPO / 2) / TILE; }
+    private int colCentro(Rectangle cuerpo) { return (cuerpo.x + CUERPO / 2) / TILE; }
+
+    // Esquina superior izquierda a la que debe dirigirse el monstruo en este ciclo.
+    private int[] destino(Rectangle monstruo, Mensaje[] jugadores) {
+        Mensaje objetivo = null;
+        int menorDistancia = Integer.MAX_VALUE;
+        for (Mensaje jugador : jugadores) {
+            if (jugador == null) continue;
+            int dx = jugador.x - monstruo.x;
+            int dy = jugador.y - monstruo.y;
+            int cuadrada = dx * dx + dy * dy;
+            if (cuadrada < menorDistancia) {
+                menorDistancia = cuadrada;
+                objetivo = jugador;
+            }
+        }
+        int fila = filaCentro(monstruo);
+        int col = colCentro(monstruo);
+        int actual = mapa.dentro(fila, col) ? distancia[fila][col] : Mapa.LEJOS;
+        // Ya esta junto al jugador, o no hay camino (por ejemplo un jugador sobre un tile bloqueado): directo.
+        if (actual <= 1 || actual == Mapa.LEJOS) return new int[] {objetivo.x, objetivo.y};
+
+        int mejor = actual;
+        int mejorFila = -1;
+        int mejorCol = -1;
+        for (int df = -1; df <= 1; df++) {
+            for (int dc = -1; dc <= 1; dc++) {
+                if (df == 0 && dc == 0) continue;
+                int nf = fila + df;
+                int nc = col + dc;
+                if (!mapa.dentro(nf, nc) || mapa.bloquea(nf, nc) || distancia[nf][nc] >= mejor) continue;
+                // En diagonal solo si no se roza una esquina bloqueada.
+                if (df != 0 && dc != 0 && (mapa.bloquea(fila + df, col) || mapa.bloquea(fila, col + dc))) continue;
+                mejor = distancia[nf][nc];
+                mejorFila = nf;
+                mejorCol = nc;
+            }
+        }
+        if (mejorFila < 0) return new int[] {objetivo.x, objetivo.y};
+        int margen = (TILE - CUERPO) / 2;
+        return new int[] {mejorCol * TILE + margen, mejorFila * TILE + margen};
     }
 
     private boolean mover(Enemigo enemigo, int dx, int dy, Mensaje[] jugadores) {
@@ -80,7 +121,7 @@ final class Monstruos {
         Rectangle siguiente = cuerpo(monstruo.x + dx, monstruo.y + dy);
         for (int fila = siguiente.y / TILE; fila <= (siguiente.y + CUERPO - 1) / TILE; fila++) {
             for (int col = siguiente.x / TILE; col <= (siguiente.x + CUERPO - 1) / TILE; col++) {
-                if (bloquea(mapa[fila][col])) return false;
+                if (mapa.bloquea(fila, col)) return false;
             }
         }
         for (Mensaje jugador : jugadores) {
@@ -98,15 +139,20 @@ final class Monstruos {
     boolean aparecer(int vida, Mensaje[] jugadores) {
         ThreadLocalRandom azar = ThreadLocalRandom.current();
         for (int intento = 0; intento < 40; intento++) {
-            int col = azar.nextInt(mapa[0].length);
-            int fila = azar.nextInt(mapa.length);
-            if (bloquea(mapa[fila][col])) continue;
+            int col = azar.nextInt(mapa.columnas());
+            int fila = azar.nextInt(mapa.filas());
+            if (mapa.bloquea(fila, col) || !mapa.alcanzable(fila, col)) continue;
             Rectangle candidato = cuerpo(col * TILE, fila * TILE);
             if (!lejosDeJugadores(candidato, jugadores) || chocaConEnemigo(candidato)) continue;
-            enemigos.add(new Enemigo(candidato, vida));
+            agregar(candidato.x, candidato.y, vida);
             return true;
         }
         return false;
+    }
+
+    // Coloca un enemigo exactamente en esa posicion (la usa aparecer y las pruebas).
+    void agregar(int x, int y, int vida) {
+        enemigos.add(new Enemigo(cuerpo(x, y), vida));
     }
 
     private boolean lejosDeJugadores(Rectangle punto, Mensaje[] jugadores) {
@@ -122,11 +168,6 @@ final class Monstruos {
             if (punto.intersects(enemigo.cuerpo)) return true;
         }
         return false;
-    }
-
-    // Arbol (1) y muro (3) bloquean el paso, igual que en el cliente.
-    private static boolean bloquea(int tile) {
-        return tile == 1 || tile == 3;
     }
 
     // Un monstruo ocupa el lugar del jugador (se usa para no dejarlo entrar en el).

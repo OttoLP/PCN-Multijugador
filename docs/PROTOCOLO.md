@@ -12,7 +12,7 @@ monstruos y reinicio de la partida. El cliente solo calcula el movimiento de su 
 
 | Campo | Tipo | Uso |
 |-------|------|-----|
-| `tipo` | texto | `autenticar`, `posiciones` o `correccion`. Obligatorio |
+| `tipo` | texto | `autenticar`, `posiciones` o `correccion`. Obligatorio. Dentro de `objetos` indica el objeto: `barril`, `corazon`, `furia` o `rapidez` |
 | `usuario` | texto | Nombre de usuario |
 | `password` | texto | Contraseña (solo en el login del cliente) |
 | `ok` | booleano | Resultado del login |
@@ -27,7 +27,9 @@ monstruos y reinicio de la partida. El cliente solo calcula el movimiento de su 
 | `restantes` | entero | Enemigos que faltan por derrotar (vivos y los que aún no salen). Solo durante una oleada |
 | `descanso` | entero | Segundos que faltan para la siguiente oleada. Solo durante el descanso |
 | `nivelDanio`, `nivelVelocidad` | enteros | Niveles de mejora de un jugador |
-| `velocidad` | decimal | Píxeles por cuadro con los que debe moverse ese jugador (el cliente la aplica) |
+| `velocidad` | decimal | Píxeles por cuadro con los que debe moverse ese jugador (el cliente la aplica). Ya incluye el bonus de rapidez |
+| `objetos` | arreglo | Barriles y objetos sueltos del mapa (`tipo`, `x`, `y` y, en los barriles, `vida` y `vidaMax`) |
+| `furia`, `rapidez` | enteros | Segundos que le quedan a un jugador de ese bonus; no se envía si no lo tiene |
 | `disparos` | arreglo | Ataques ocurridos en ese mensaje; el cliente los dibuja unos instantes |
 
 ## 1. Autenticación
@@ -41,7 +43,7 @@ El cliente abre el socket y envía **como primer mensaje**:
 El servidor responde:
 
 ```json
-{"tipo":"autenticar","usuario":"Jugador1","ok":true,"contenido":"Bienvenido","id":0,"x":100,"y":100}
+{"tipo":"autenticar","usuario":"Jugador1","ok":true,"contenido":"Bienvenido","id":0,"x":918,"y":1014}
 ```
 
 o, si no entra:
@@ -66,16 +68,17 @@ El servidor envía a **todos** los jugadores el estado completo cada vez que alg
 (un jugador o un monstruo se mueve, alguien recibe daño, etc.):
 
 ```json
-{"tipo":"posiciones","jugadores":[{"usuario":"Jugador1","id":0,"x":148,"y":100,"vida":80,"vidaMax":100,"nivelDanio":2,"nivelVelocidad":1,"velocidad":4.3},{"usuario":"Jugador2","id":1,"x":196,"y":100,"vida":100,"vidaMax":100,"nivelDanio":1,"nivelVelocidad":3,"velocidad":4.9},null,null],"monstruos":[{"x":480,"y":96,"vida":27,"vidaMax":35}],"oleada":2,"restantes":9,"disparos":[{"id":0,"x":480,"y":96}]}
+{"tipo":"posiciones","jugadores":[{"usuario":"Jugador1","id":0,"x":918,"y":1014,"vida":80,"vidaMax":100,"nivelDanio":2,"nivelVelocidad":1,"velocidad":4.3,"furia":7},{"usuario":"Jugador2","id":1,"x":966,"y":1014,"vida":100,"vidaMax":100,"nivelDanio":1,"nivelVelocidad":3,"velocidad":4.9},null,null],"monstruos":[{"x":480,"y":96,"vida":27,"vidaMax":35}],"oleada":2,"restantes":9,"objetos":[{"tipo":"barril","x":1230,"y":870,"vida":10,"vidaMax":20},{"tipo":"corazon","x":1002,"y":1062},{"tipo":"furia","x":1182,"y":1110}],"disparos":[{"id":0,"x":480,"y":96}]}
 ```
 
 - Un jugador con `vida` 0 está **caído**: el servidor ignora sus posiciones.
-- Solo se envían los monstruos vivos, así que el arreglo `monstruos` cambia de tamaño.
+- Solo se envían los monstruos vivos, así que el arreglo `monstruos` cambia de tamaño. Lo mismo vale para `objetos`.
 - `disparos` solo aparece en el mensaje donde ocurrió el ataque.
 
 Reglas del servidor:
 
-- Posición inicial: `x = 100 + id * 96`, `y = 100` (si hay un monstruo encima, se corre a la derecha).
+- Posición inicial: sobre el camino junto a la fuente, en el centro del mapa: fila 21 del mapa y columnas 19, 20, 26 y 27 según el `id`
+  (si hay un monstruo encima, se corre a la derecha).
 - Rango válido: `x` e `y` de 0 a 2352 (mundo de 50 × 50 tiles de 48 px). Fuera de rango **cierra la conexión**.
 - Usa siempre el `id` de la conexión, nunca uno enviado por el cliente.
 - Un mensaje fuera del protocolo **cierra la conexión** de ese cliente.
@@ -86,7 +89,7 @@ Reglas del servidor:
 El servidor ordena al cliente volver a una posición (choque con un monstruo, reinicio de partida):
 
 ```json
-{"tipo":"correccion","x":100,"y":100}
+{"tipo":"correccion","x":918,"y":1014}
 ```
 
 ## 3. Combate, oleadas y mejoras
@@ -135,8 +138,43 @@ Al terminar cada oleada, **cada jugador recibe una mejora al azar**, sin elegir:
 Ejemplo del estado durante el descanso, con un jugador que cayó y fue penalizado:
 
 ```json
-{"tipo":"posiciones","jugadores":[{"usuario":"Jugador1","contenido":"+1 DAÑO   |   Caiste: -1 VELOCIDAD","id":0,"x":148,"y":100,"vida":50,"vidaMax":100,"nivelDanio":2,"nivelVelocidad":1,"velocidad":4.3},{"usuario":"Jugador2","id":1,"x":196,"y":100,"vida":100,"vidaMax":100,"nivelDanio":1,"nivelVelocidad":3,"velocidad":4.9},null,null],"monstruos":[],"oleada":2,"descanso":5}
+{"tipo":"posiciones","jugadores":[{"usuario":"Jugador1","contenido":"+1 DAÑO   |   Caiste: -1 VELOCIDAD","id":0,"x":918,"y":1014,"vida":50,"vidaMax":100,"nivelDanio":2,"nivelVelocidad":1,"velocidad":4.3},{"usuario":"Jugador2","id":1,"x":966,"y":1014,"vida":100,"vidaMax":100,"nivelDanio":1,"nivelVelocidad":3,"velocidad":4.9},null,null],"monstruos":[],"oleada":2,"descanso":5}
 ```
+
+### El mapa
+
+El mundo mide 50 × 50 tiles de 48 px y se define en `cliente/src/escenarios/`, que leen el cliente y el servidor:
+
+- `mundo.txt`: el código de tile de cada casilla.
+- `tiles.txt`: qué hace cada tile (si **bloquea** el paso, es **lento** o **cura**) y qué imagen usa.
+  Es el único lugar donde se decide eso, así que un tile nuevo se agrega con una línea.
+
+| Tile | Efecto |
+|------|--------|
+| Árbol y muro | Bloquean a jugadores y monstruos |
+| Pantano (agua) | Jugadores y monstruos avanzan al 60 % |
+| Fuente (3 × 3 tiles en el cruce de caminos) | El jugador vivo que se para encima recupera 6 de vida por segundo |
+
+- Los monstruos siguen el camino más corto por tiles libres hasta el jugador vivo más cercano (rodean muros y árboles).
+- Los monstruos y los barriles solo aparecen en tiles que se alcanzan caminando desde las salidas de los jugadores.
+- El pantano del jugador lo calcula el cliente (como todo su movimiento); el servidor no lo verifica.
+
+**Barriles y objetos sueltos**
+
+- Hay hasta 12 barriles (vida 20). Se reponen de a uno por segundo, **solo durante el descanso**, en tiles secos y lejos de los jugadores.
+  No bloquean el paso.
+- El ataque automático golpea primero a los monstruos; si no hay ninguno en alcance, golpea al barril más cercano.
+- Al romperse, un barril suelta (o no) un objeto que desaparece a los 20 s si nadie lo toma:
+
+| Objeto | Probabilidad | Efecto al tocarlo |
+|--------|--------------|-------------------|
+| Corazón | 55 % | +25 de vida. No se recoge si el jugador tiene la vida completa |
+| Furia | 20 % | Daño × 1.5 durante 10 s |
+| Rapidez | 20 % | Velocidad × 1.4 durante 10 s (se refleja en `velocidad`) |
+| Nada | 5 % | |
+
+- Un jugador que cae pierde sus bonus. Un bonus nuevo del mismo tipo reinicia los 10 s en lugar de sumarse.
+- El minimapa y el dibujo de los objetos son solo del cliente; no viajan por el protocolo.
 
 ### Fin de la partida
 
@@ -147,7 +185,7 @@ Si alguien entra mientras la partida está terminada, la reinicia para todos.
 Si todos se van, la partida también se reinicia.
 
 ```json
-{"tipo":"posiciones","jugadores":[{"usuario":"Jugador2","id":1,"x":196,"y":100,"vida":0,"vidaMax":100,"nivelDanio":0,"nivelVelocidad":2,"velocidad":4.6},null,null,null],"monstruos":[{"x":576,"y":96,"vida":35,"vidaMax":35}],"fin":true,"oleada":2,"restantes":5}
+{"tipo":"posiciones","jugadores":[{"usuario":"Jugador2","id":1,"x":966,"y":1014,"vida":0,"vidaMax":100,"nivelDanio":0,"nivelVelocidad":2,"velocidad":4.6},null,null,null],"monstruos":[{"x":576,"y":96,"vida":35,"vidaMax":35}],"fin":true,"oleada":2,"restantes":5}
 ```
 
 ## 4. Salida

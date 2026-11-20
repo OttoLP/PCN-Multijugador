@@ -22,6 +22,10 @@ public class Mensaje {
     // En un jugador, contenido trae el aviso de mejora durante el descanso.
     public Integer nivelDanio, nivelVelocidad;
     public Double velocidad;
+    // Mapa: barriles y objetos sueltos (tipo, x, y y, en barriles, vida) y segundos que quedan
+    // de los bonus de un jugador (furia: mas daño; rapidez: mas velocidad).
+    public Mensaje[] objetos;
+    public Integer furia, rapidez;
     public Mensaje[] disparos;
 
     public Mensaje() {}

@@ -2,16 +2,20 @@ package tile;
 
 import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
 import main.GamePanel;
 
 
 public class ManejadorTiles {
     private GamePanel gp;
-    private int maxTiles = 10;
+    private static final int TAM_IMAGEN = 16; // los tiles miden 16 x 16 px
+    private int maxTiles = 32;
     Tile[] arregloTiles;
     private int mapCodeTile[][];
 
@@ -23,36 +27,44 @@ public class ManejadorTiles {
         cargarEscenario();
     }
     
+    // Los tiles se definen en escenarios/tiles.txt (lo lee tambien el servidor).
     void getImagenesTile(){
-        try{
-            arregloTiles[0] = new Tile();
-            arregloTiles[0].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/agua.png")));
-            arregloTiles[0].setColision(false);
-
-            arregloTiles[1] = new Tile();
-            arregloTiles[1].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/arbol.png")));
-            arregloTiles[1].setColision(true);
-
-            arregloTiles[2] = new Tile();
-            arregloTiles[2].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/arena.png")));
-            arregloTiles[2].setColision(false);
-
-            arregloTiles[3] = new Tile();
-            arregloTiles[3].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/muro.png")));
-            arregloTiles[3].setColision(true);
-
-            arregloTiles[4] = new Tile();
-            arregloTiles[4].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/pasto.png")));
-            arregloTiles[4].setColision(false);
-
-            arregloTiles[5] = new Tile();
-            arregloTiles[5].setImage(ImageIO.read(getClass().getResourceAsStream("/tiles/suelo.png")));
-            arregloTiles[5].setColision(false);
-
-        }catch(Exception e){
+        try (InputStream definicion = getClass().getResourceAsStream("/escenarios/tiles.txt")) {
+            if (definicion == null) {
+                System.err.println("No se encontro /escenarios/tiles.txt");
+                return;
+            }
+            BufferedReader br = new BufferedReader(new InputStreamReader(definicion, StandardCharsets.UTF_8));
+            String linea;
+            while ((linea = br.readLine()) != null) {
+                int comentario = linea.indexOf('#');
+                if (comentario >= 0) linea = linea.substring(0, comentario);
+                linea = linea.trim();
+                if (linea.isEmpty()) continue;
+                // codigo  imagen  bloquea  lento  cura
+                String[] campos = linea.split("\\s+");
+                Tile tile = new Tile();
+                tile.setImage(cargarImagen(campos[1]));
+                tile.setColision(campos[2].equals("1"));
+                tile.setLento(campos[3].equals("1"));
+                tile.setCura(campos[4].equals("1"));
+                arregloTiles[Integer.parseInt(campos[0])] = tile;
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
+    }
 
+    // "archivo.png" o "archivo.png@col,fila" para tomar un tile de 16 x 16 de una hoja de tiles.
+    private BufferedImage cargarImagen(String especificacion) throws IOException {
+        int arroba = especificacion.indexOf('@');
+        String archivo = arroba < 0 ? especificacion : especificacion.substring(0, arroba);
+        BufferedImage hoja = ImageIO.read(getClass().getResourceAsStream("/tiles/" + archivo));
+        if (arroba < 0) return hoja;
+        String[] posicion = especificacion.substring(arroba + 1).split(",");
+        int col = Integer.parseInt(posicion[0]);
+        int fila = Integer.parseInt(posicion[1]);
+        return hoja.getSubimage(col * TAM_IMAGEN, fila * TAM_IMAGEN, TAM_IMAGEN, TAM_IMAGEN);
     }
 
     public void cargarEscenario() {
@@ -98,5 +110,9 @@ public class ManejadorTiles {
 
     public boolean getColisionDeTile(int index){
         return this.arregloTiles[index].getColision();
+    }
+
+    public Tile getTile(int index){
+        return this.arregloTiles[index];
     }
 }

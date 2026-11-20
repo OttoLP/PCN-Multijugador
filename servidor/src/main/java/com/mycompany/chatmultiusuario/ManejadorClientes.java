@@ -1,5 +1,6 @@
 package com.mycompany.chatmultiusuario;
 
+import java.awt.Rectangle;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -15,7 +16,9 @@ public class ManejadorClientes implements Runnable {
     private static final ManejadorClientes[] clientes = new ManejadorClientes[4];
     // El escenario mundo.txt mide 50 x 50 tiles de 48 px.
     private static final int MAX_POSICION_MUNDO = (50 - 1) * 48;
-    private static final Monstruos monstruos = new Monstruos();
+    private static final Mapa mapa = Mapa.cargar();
+    private static final Monstruos monstruos = new Monstruos(mapa);
+    private static final Objetos objetos = new Objetos(mapa);
     private static final Oleadas oleadas = new Oleadas();
     // Todos los jugadores cayeron: se espera Combate.REINICIO_MS y se reinicia.
     private static boolean finPartida;
@@ -42,6 +45,12 @@ public class ManejadorClientes implements Runnable {
     private long proximoAtaque;
     private final Mejoras mejoras = new Mejoras();
     private String aviso; // mejora recibida al superar la oleada (solo durante el descanso)
+    // Bonus temporales de los objetos sueltos y cura acumulada de la fuente.
+    private long furiaHasta;
+    private long rapidezHasta;
+    private int furiaSeg;
+    private int rapidezSeg;
+    private double curaFuente;
 
     public ManejadorClientes(Socket socket) { this.socket = socket; }
 
@@ -133,6 +142,7 @@ public class ManejadorClientes implements Runnable {
                     if (Arrays.stream(clientes).allMatch(cliente -> cliente == null)) {
                         monstruos.reiniciar();
                         oleadas.reiniciar();
+                        objetos.reiniciar();
                         finPartida = false;
                     }
                     enviarPosiciones();
@@ -161,12 +171,12 @@ public class ManejadorClientes implements Runnable {
         salida.flush();
     }
 
-    // Lugar de salida segun el numero de jugador, esquivando monstruos.
+    // Lugar de salida segun el numero de jugador (junto a la fuente), esquivando monstruos.
     private void colocarEnInicio() {
-        x = 100 + id * 96;
-        y = 100;
-        while (monstruos.choca(x, y) && x < 900) {
-            x += 48;
+        x = mapa.inicioX(id);
+        y = mapa.inicioY(id);
+        for (int i = 0; i < 6 && monstruos.choca(x, y); i++) {
+            x += Mapa.TILE;
         }
     }
 
@@ -186,23 +196,80 @@ public class ManejadorClientes implements Runnable {
         if (ahora < invulnerableHasta || !monstruos.toca(x, y)) return false;
         vida = Math.max(0, vida - Combate.DANIO_CONTACTO);
         invulnerableHasta = ahora + Combate.INVULNERABLE_MS;
-        if (vida == 0) System.out.println(usuario + " cayo.");
+        if (vida == 0) {
+            furiaHasta = 0;     // al caer se pierden los bonus
+            rapidezHasta = 0;
+            System.out.println(usuario + " cayo.");
+        }
         return true;
     }
 
-    // Ataque automatico al monstruo mas cercano dentro del alcance.
+    // Ataque automatico: al monstruo mas cercano dentro del alcance y, si no hay ninguno, al barril mas cercano.
     private boolean atacar(long ahora, List<Mensaje> disparos) {
         if (ahora < proximoAtaque) return false;
         int objetivo = monstruos.masCercano(x, y, Combate.ALCANCE_ATAQUE);
-        if (objetivo < 0) return false;
+        int barril = -1;
+        if (objetivo < 0) {
+            barril = objetos.barrilMasCercano(x, y, Combate.ALCANCE_ATAQUE);
+            if (barril < 0) return false;
+        }
         proximoAtaque = ahora + Combate.ATAQUE_ESPERA_MS;
+        Rectangle blanco = objetivo >= 0 ? monstruos.posicion(objetivo) : objetos.posicion(barril);
         Mensaje disparo = new Mensaje();
         disparo.id = id;
-        disparo.x = monstruos.posicion(objetivo).x;
-        disparo.y = monstruos.posicion(objetivo).y;
+        disparo.x = blanco.x;
+        disparo.y = blanco.y;
         disparos.add(disparo);
-        monstruos.danar(objetivo, mejoras.danioAtaque());
+        if (objetivo >= 0) monstruos.danar(objetivo, danioActual(ahora));
+        else objetos.danarBarril(barril, danioActual(ahora), ahora);
         return true;
+    }
+
+    // Daño del ataque: mejoras de nivel y, mientras dure, el bonus de furia.
+    private int danioActual(long ahora) {
+        int base = mejoras.danioAtaque();
+        return furiaHasta > ahora ? (int) Math.ceil(base * Combate.FACTOR_FURIA) : base;
+    }
+
+    private int filaCentro() { return (y + Mapa.CUERPO / 2) / Mapa.TILE; }
+    private int colCentro() { return (x + Mapa.CUERPO / 2) / Mapa.TILE; }
+
+    // Fuente que cura, objetos sueltos y bonus. Devuelve true si algo cambio.
+    private boolean interactuar(long ahora) {
+        boolean cambio = false;
+        int max = Combate.VIDA_JUGADOR;
+        if (vida < max && mapa.cura(filaCentro(), colCentro())) {
+            curaFuente += Combate.CURA_FUENTE_POR_SEGUNDO * 0.05; // cada ciclo dura 50 ms
+            int entera = (int) curaFuente;
+            if (entera > 0) {
+                curaFuente -= entera;
+                vida = Math.min(max, vida + entera);
+                cambio = true;
+            }
+        } else {
+            curaFuente = 0;
+        }
+        String tomado = objetos.recoger(x, y, vida >= max);
+        if (tomado != null) {
+            switch (tomado) {
+                case Objetos.CORAZON -> vida = Math.min(max, vida + Combate.CURA_CORAZON);
+                case Objetos.FURIA -> furiaHasta = ahora + Combate.BONUS_MS;
+                case Objetos.RAPIDEZ -> rapidezHasta = ahora + Combate.BONUS_MS;
+                default -> { }
+            }
+            cambio = true;
+        }
+        // Cuenta regresiva de los bonus: se avisa a los clientes cada vez que cambia un segundo.
+        int furia = segundos(furiaHasta, ahora);
+        int rapidez = segundos(rapidezHasta, ahora);
+        if (furia != furiaSeg || rapidez != rapidezSeg) cambio = true;
+        furiaSeg = furia;
+        rapidezSeg = rapidez;
+        return cambio;
+    }
+
+    private static int segundos(long hasta, long ahora) {
+        return hasta <= ahora ? 0 : (int) Math.ceil((hasta - ahora) / 1000.0);
     }
 
     // Se llama cada 50 ms.
@@ -222,9 +289,11 @@ public class ManejadorClientes implements Runnable {
                 cambio |= jugador.recibirGolpes(ahora);
                 if (jugador.vida > 0) {
                     cambio |= jugador.atacar(ahora, disparos);
+                    cambio |= jugador.interactuar(ahora);
                     alguienVivo = true;
                 }
             }
+            cambio |= objetos.limpiar(ahora);
             if (!alguienVivo) {
                 finPartida = true;
                 reinicioEn = ahora + Combate.REINICIO_MS;
@@ -248,6 +317,8 @@ public class ManejadorClientes implements Runnable {
                     case SIN_CAMBIO -> { }
                 }
             }
+            // Los barriles se reponen solo durante el descanso.
+            if (alguienVivo && !oleadas.enCurso()) cambio |= objetos.reponerBarril(ahora, posicionesVivos());
             if (cambio) enviarPosiciones(disparos);
         }
     }
@@ -291,6 +362,7 @@ public class ManejadorClientes implements Runnable {
         finPartida = false;
         monstruos.reiniciar();
         oleadas.reiniciar();
+        objetos.reiniciar();
         long ahora = System.currentTimeMillis();
         for (ManejadorClientes cliente : clientes) {
             if (cliente == null) continue;
@@ -299,6 +371,9 @@ public class ManejadorClientes implements Runnable {
             cliente.proximoAtaque = 0;
             cliente.mejoras.reiniciar();
             cliente.aviso = null;
+            cliente.furiaHasta = 0;
+            cliente.rapidezHasta = 0;
+            cliente.curaFuente = 0;
             cliente.colocarEnInicio();
             cliente.enviarPosicionActual();
         }
@@ -315,6 +390,7 @@ public class ManejadorClientes implements Runnable {
         Mensaje estado = new Mensaje("posiciones");
         estado.jugadores = posicionesJugadores();
         estado.monstruos = monstruos.posiciones();
+        estado.objetos = objetos.posiciones();
         if (finPartida) estado.fin = true;
         estado.oleada = oleadas.numero();
         if (oleadas.enCurso()) estado.restantes = oleadas.restantes(monstruos);
@@ -329,6 +405,7 @@ public class ManejadorClientes implements Runnable {
     }
 
     private static Mensaje[] posicionesJugadores() {
+        long ahora = System.currentTimeMillis();
         Mensaje[] jugadores = new Mensaje[clientes.length];
         for (int i = 0; i < clientes.length; i++) {
             ManejadorClientes cliente = clientes[i];
@@ -342,7 +419,12 @@ public class ManejadorClientes implements Runnable {
                 jugador.vidaMax = Combate.VIDA_JUGADOR;
                 jugador.nivelDanio = cliente.mejoras.nivelDanio();
                 jugador.nivelVelocidad = cliente.mejoras.nivelVelocidad();
-                jugador.velocidad = cliente.mejoras.velocidad();
+                jugador.velocidad = cliente.mejoras.velocidad()
+                        * (cliente.rapidezHasta > ahora ? Combate.FACTOR_RAPIDEZ : 1);
+                int furia = segundos(cliente.furiaHasta, ahora);
+                int rapidez = segundos(cliente.rapidezHasta, ahora);
+                jugador.furia = furia > 0 ? furia : null;
+                jugador.rapidez = rapidez > 0 ? rapidez : null;
                 jugador.contenido = cliente.aviso;
                 jugadores[i] = jugador;
             }

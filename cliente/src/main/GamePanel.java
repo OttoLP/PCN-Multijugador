@@ -3,6 +3,7 @@ package main;
 import javax.swing.*;
 import entidad.Jugador;
 import entidad.Monstruo;
+import entidad.Objetos;
 import tile.ManejadorTiles;
 import red.Cliente;
 import red.Mensaje;
@@ -25,7 +26,10 @@ public class GamePanel extends JPanel implements Runnable {
     Jugador[] jugadores = new Jugador[4];
     private final Monstruo monstruo = new Monstruo();
     private Mensaje[] monstruos;
+    private Mensaje[] objetos;
+    private final Objetos objetosVista = new Objetos();
     ManejadorTiles mTi = new ManejadorTiles(this);
+    private final Minimapa minimapa = new Minimapa(mTi, worldRows, worldCols);
     DetectorColisiones dC = new DetectorColisiones(this);
     Cliente cliente;
     int FPS = 60;
@@ -73,6 +77,7 @@ public class GamePanel extends JPanel implements Runnable {
         Mensaje[] estado = mensaje.jugadores;
         if (estado == null) return;
         monstruos = mensaje.monstruos;
+        objetos = mensaje.objetos;
         for (int i = 0; i < jugadores.length; i++) {
             if (i == cliente.getId()) continue;
             if (estado[i] == null) {
@@ -125,12 +130,15 @@ public class GamePanel extends JPanel implements Runnable {
         int camaraY = Math.max(0, Math.min(local.getY() - local.getPantallaY(),
                 getHeightWorld() - heightScreen));
         mTi.draw(g2, camaraX, camaraY);
+        objetosVista.draw(g2, objetos, camaraX, camaraY);
         monstruo.draw(g2, monstruos, camaraX, camaraY, tileSize);
         dibujaDisparos(g2, camaraX, camaraY);
         for (Jugador jugador : jugadores) {
             if (jugador != null) jugador.draw(g2, camaraX, camaraY);
         }
         dibujaInterfaz(g2, local);
+        minimapa.draw(g2, widthScreen - minimapa.getAncho() - 12, heightScreen - minimapa.getAlto() - 12,
+                jugadores, cliente.getId(), monstruos, objetos, camaraX, camaraY, widthScreen, heightScreen, tileSize);
         if (!cliente.estaConectado()) {
             g2.setColor(new Color(0, 0, 0, 190));
             g2.fillRect(0, 0, widthScreen, 50);
@@ -173,6 +181,7 @@ public class GamePanel extends JPanel implements Runnable {
         dibujaOleada(g2, estado);
         Mensaje[] jugadoresEstado = estado.jugadores;
         Mensaje yo = jugadoresEstado == null ? null : jugadoresEstado[cliente.getId()];
+        if (yo != null) dibujaBonus(g2, yo, margen, margen + alto + 42);
         if (estado.descanso != null && yo != null && yo.contenido != null
                 && !Boolean.TRUE.equals(estado.fin) && !local.isMuerto()) {
             dibujaAviso(g2, yo.contenido);
@@ -184,6 +193,20 @@ public class GamePanel extends JPanel implements Runnable {
                     : "Todos cayeron. Reiniciando...");
         } else if (local.isMuerto()) {
             mensajeCentral(g2, "HAS CAIDO", "La partida se reinicia cuando todos caigan.");
+        }
+    }
+
+    // Bonus activos y segundos que les quedan (furia: mas daño; rapidez: mas velocidad).
+    private void dibujaBonus(Graphics2D g2, Mensaje yo, int x, int y) {
+        g2.setFont(new Font("SansSerif", Font.BOLD, 14));
+        if (yo.furia != null) {
+            g2.setColor(new Color(255, 160, 50));
+            g2.drawString("FURIA  " + yo.furia + " s", x, y);
+            x += 100;
+        }
+        if (yo.rapidez != null) {
+            g2.setColor(new Color(90, 210, 255));
+            g2.drawString("RAPIDEZ  " + yo.rapidez + " s", x, y);
         }
     }
 
@@ -241,4 +264,5 @@ public class GamePanel extends JPanel implements Runnable {
     public int getWidthScreen() { return widthScreen; }
     public int getHeightScreen() { return heightScreen; }
     public DetectorColisiones getDetectorColisiones(){ return this.dC; }
+    public ManejadorTiles getManejadorTiles() { return mTi; }
 }

@@ -1,14 +1,13 @@
 package entidad;
 
 import java.awt.Rectangle;
-import java.awt.image.BufferedImage;
 
 public class Entidad {
     protected int x, y, velocidad;
     protected int xMundo, yMundo;
-    protected BufferedImage arriba1,arriba2,abajo1,abajo2,izquierda1,izquierda2,derecha1,derecha2;
     protected String direccion;
-    protected int contadorSprites = 0, numeroSprites = 1, cambiaSprite = 10;
+    // cuadroActual: cuadro de la animacion de caminata (0 = de pie). cambiaSprite: ciclos de juego por cuadro.
+    protected int contadorSprites = 0, cuadroActual = 0, cambiaSprite = 7;
     protected Rectangle hitbox;
     protected boolean colisionActivada = false;
 
