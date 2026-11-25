@@ -1,0 +1,12 @@
+Juego desarrollado para la materia de Principios de Computo en la Nube.
+
+Profesor: 
+Dr. Francisco Javier Torres Reyes
+
+Estudiantes: 
+Francisco Abundis Avalos
+Alberto Otoniel Lopez Romero
+Karla Dayana Mejia Padron
+Eloy Emilio Hernandez Hernandez
+Jose Orlando Juarez Ramirez
+Jacobo Rodriguez Torres
