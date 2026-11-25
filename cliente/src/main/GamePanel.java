@@ -4,24 +4,25 @@ import javax.swing.*;
 import entidad.Jugador;
 import entidad.Monstruo;
 import entidad.Objetos;
+import menus.MenuPausa;
 import tile.ManejadorTiles;
 import red.Cliente;
 import red.Mensaje;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
-import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
 public class GamePanel extends JPanel implements Runnable {
-    final int originalTileSize = 16;
-    final int scale = 3;
-    final int tileSize = originalTileSize * scale;
+    static final int originalTileSize = 16;
+    static final int scale = 3;
+    static final int tileSize = originalTileSize * scale;
     final int worldCols = 50;
     final int worldRows = 50;
-    final int maxCols = 26;
-    final int maxRows = 15;
+    static final int maxCols = 26;
+    static final int maxRows = 15;
+    public static final Dimension TAMANO_PANTALLA = new Dimension(tileSize * maxCols, tileSize * maxRows);
     final int widthScreen = tileSize * maxCols;
     final int heightScreen = tileSize * maxRows;
     volatile Thread gameThread;
@@ -36,14 +37,17 @@ public class GamePanel extends JPanel implements Runnable {
     DetectorColisiones dC = new DetectorColisiones(this);
     Cliente cliente;
     int FPS = 60;
-    private volatile boolean menuMusicaAbierto = false;
-    private final Rectangle botonMusica = new Rectangle();
-    private final Rectangle barraMusica = new Rectangle();
-    private final Rectangle botonCerrarMusica = new Rectangle();
-    private boolean arrastrandoBarraMusica = false;
+    private volatile boolean menuAbierto = false;
+    private final Rectangle botonMenu = new Rectangle();
+    private final MenuPausa menuPausa;
+    private double escala = 1;
+    private int desplazamientoX, desplazamientoY;
 
-    public GamePanel(Cliente cliente) {
+    public GamePanel(Cliente cliente, Runnable alCambiarPantalla, Runnable alVolverAlMenu) {
         this.cliente = cliente;
+        menuPausa = new MenuPausa(this::alternarMenu, alCambiarPantalla, alVolverAlMenu);
+        setLayout(new BorderLayout());
+        add(menuPausa, BorderLayout.CENTER);
         int id = cliente.getId();
         jugadores[id] = new Jugador(this, kM, id, cliente.getUsuario());
         jugadores[id].setX(cliente.getX());
@@ -52,20 +56,12 @@ public class GamePanel extends JPanel implements Runnable {
         setBackground(Color.BLACK);
         setDoubleBuffered(true);
         addKeyListener(kM);
-        kM.setMenuHandlers(this::alternarMenuMusica, this::manejarTeclaMenu);
-        MouseAdapter ratonMusica = new MouseAdapter() {
+        kM.setManejadorMenu(this::alternarMenu);
+        addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) {
-                manejarClicMusica(e.getX(), e.getY());
+                if (botonMenu.contains(haciaJuegoX(e.getX()), haciaJuegoY(e.getY()))) alternarMenu();
             }
-            @Override public void mouseDragged(MouseEvent e) {
-                manejarArrastreMusica(e.getX());
-            }
-            @Override public void mouseReleased(MouseEvent e) {
-                arrastrandoBarraMusica = false;
-            }
-        };
-        addMouseListener(ratonMusica);
-        addMouseMotionListener(ratonMusica);
+        });
         addFocusListener(new FocusAdapter() {
             @Override public void focusLost(FocusEvent e) { kM.soltarTeclas(); }
         });
@@ -133,7 +129,7 @@ public class GamePanel extends JPanel implements Runnable {
             local.setY(correccion.y);
         }
         if (local.isMuerto()) return; // un jugador caido ya no se mueve
-        if (menuMusicaAbierto) return;
+        if (menuAbierto) return;
         int antesX = local.getX(), antesY = local.getY();
         local.update();
         if (monstruo.choca(local.getX(), local.getY(), monstruos)) {
@@ -149,6 +145,10 @@ public class GamePanel extends JPanel implements Runnable {
     public synchronized void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
+        calcularEscala();
+        g2.translate(desplazamientoX, desplazamientoY);
+        g2.scale(escala, escala);
+        g2.clipRect(0, 0, widthScreen, heightScreen);
         Jugador local = jugadores[cliente.getId()];
         int camaraX = Math.max(0, Math.min(local.getX() - local.getPantallaX(),
                 getWidthWorld() - widthScreen));
@@ -164,14 +164,29 @@ public class GamePanel extends JPanel implements Runnable {
         dibujaInterfaz(g2, local);
         minimapa.draw(g2, widthScreen - minimapa.getAncho() - 12, heightScreen - minimapa.getAlto() - 12,
                 jugadores, cliente.getId(), monstruos, objetos, camaraX, camaraY, widthScreen, heightScreen, tileSize);
-        if (menuMusicaAbierto) dibujaMenuMusica(g2);
         if (!cliente.estaConectado()) {
             g2.setColor(new Color(0, 0, 0, 190));
             g2.fillRect(0, 0, widthScreen, 50);
             g2.setColor(Color.WHITE);
-            g2.drawString(cliente.getError() + " Cierra y vuelve a abrir el cliente.", 20, 30);
+            g2.drawString(cliente.getError() + " Pulsa ESC para regresar al menú.", 20, 30);
         }
         g2.dispose();
+    }
+
+    // Ajusta el juego al panel manteniendo la proporcion; si sobra espacio, queda centrado con bordes negros.
+    private void calcularEscala() {
+        escala = Math.min((double) getWidth() / widthScreen, (double) getHeight() / heightScreen);
+        desplazamientoX = (int) ((getWidth() - widthScreen * escala) / 2);
+        desplazamientoY = (int) ((getHeight() - heightScreen * escala) / 2);
+    }
+
+    // Convierte una posicion del raton (pixeles del panel) a coordenadas del juego.
+    private int haciaJuegoX(int xPanel) {
+        return (int) ((xPanel - desplazamientoX) / escala);
+    }
+
+    private int haciaJuegoY(int yPanel) {
+        return (int) ((yPanel - desplazamientoY) / escala);
     }
 
     // Linea breve desde el jugador que ataca hasta su objetivo.
@@ -220,116 +235,34 @@ public class GamePanel extends JPanel implements Runnable {
         } else if (local.isMuerto()) {
             mensajeCentral(g2, "HAS CAIDO", "La partida se reinicia cuando todos caigan.");
         }
-        dibujaBotonMusica(g2);
+        dibujaBotonMenu(g2);
     }
 
-    private void alternarMenuMusica() {
-        menuMusicaAbierto = !menuMusicaAbierto;
-        arrastrandoBarraMusica = false;
+    private void alternarMenu() {
+        menuAbierto = !menuAbierto;
         kM.soltarTeclas();
+        menuPausa.setVisible(menuAbierto);
         repaint();
     }
 
-    private void manejarTeclaMenu(int code) {
-        if (!menuMusicaAbierto) return;
-        switch (code) {
-            case KeyEvent.VK_LEFT, KeyEvent.VK_A -> Sonido.setVolumenMusica(Sonido.getVolumenMusica() - 5);
-            case KeyEvent.VK_RIGHT, KeyEvent.VK_D -> Sonido.setVolumenMusica(Sonido.getVolumenMusica() + 5);
-        }
-        repaint();
+    public void actualizarModoPantalla(boolean pantallaCompleta) {
+        menuPausa.actualizarModoPantalla(pantallaCompleta);
     }
 
-    private void manejarClicMusica(int x, int y) {
-        if (botonMusica.contains(x, y)) {
-            alternarMenuMusica();
-            return;
-        }
-        if (!menuMusicaAbierto) return;
-        if (botonCerrarMusica.contains(x, y)) {
-            alternarMenuMusica();
-            return;
-        }
-        if (barraMusica.contains(x, y)) {
-            arrastrandoBarraMusica = true;
-            actualizarBarraDesdeX(x);
-        }
-    }
-
-    private void manejarArrastreMusica(int x) {
-        if (!menuMusicaAbierto || !arrastrandoBarraMusica) return;
-        actualizarBarraDesdeX(x);
-    }
-
-    private void actualizarBarraDesdeX(int x) {
-        int pct = (int) Math.round(((x - barraMusica.x) * 100.0) / Math.max(1, barraMusica.width));
-        Sonido.setVolumenMusica(pct);
-        repaint();
-    }
-
-    private void dibujaBotonMusica(Graphics2D g2) {
-        String label = "Musica (ESC)";
+    private void dibujaBotonMenu(Graphics2D g2) {
+        String label = "Menú (ESC)";
         g2.setFont(new Font("SansSerif", Font.BOLD, 13));
         int w = g2.getFontMetrics().stringWidth(label) + 20;
         int h = 28;
         int x = widthScreen - w - 16;
         int y = 14;
-        botonMusica.setBounds(x, y, w, h);
+        botonMenu.setBounds(x, y, w, h);
         g2.setColor(new Color(20, 20, 20, 200));
         g2.fillRoundRect(x, y, w, h, 8, 8);
-        g2.setColor(menuMusicaAbierto ? new Color(255, 220, 120) : new Color(180, 180, 180));
+        g2.setColor(menuAbierto ? new Color(255, 220, 120) : new Color(180, 180, 180));
         g2.drawRoundRect(x, y, w, h, 8, 8);
         g2.setColor(Color.WHITE);
         g2.drawString(label, x + 10, y + 19);
-    }
-
-    private void dibujaMenuMusica(Graphics2D g2) {
-        g2.setColor(new Color(0, 0, 0, 140));
-        g2.fillRect(0, 0, widthScreen, heightScreen);
-
-        int panelW = 360, panelH = 164;
-        int px = (widthScreen - panelW) / 2;
-        int py = (heightScreen - panelH) / 2;
-
-        g2.setColor(new Color(28, 30, 38, 240));
-        g2.fillRoundRect(px, py, panelW, panelH, 14, 14);
-        g2.setColor(new Color(120, 130, 150));
-        g2.drawRoundRect(px, py, panelW, panelH, 14, 14);
-
-        g2.setColor(Color.WHITE);
-        g2.setFont(new Font("SansSerif", Font.BOLD, 20));
-        g2.drawString("MUSICA", px + 24, py + 34);
-
-        dibujaSlider(g2, px + 24, py + 58, panelW - 48, "Musica", Sonido.getVolumenMusica(), barraMusica);
-
-        int btnW = 100, btnH = 30;
-        int bx = px + panelW - btnW - 24;
-        int by = py + panelH - btnH - 18;
-        botonCerrarMusica.setBounds(bx, by, btnW, btnH);
-        g2.setColor(new Color(65, 75, 95));
-        g2.fillRoundRect(bx, by, btnW, btnH, 8, 8);
-        g2.setColor(Color.WHITE);
-        g2.setFont(new Font("SansSerif", Font.BOLD, 13));
-        g2.drawString("Cerrar (ESC)", bx + 11, by + 20);
-
-        g2.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        g2.setColor(new Color(180, 185, 200));
-        g2.drawString("Flechas/AD o clic para ajustar", px + 24, by + 20);
-    }
-
-    private void dibujaSlider(Graphics2D g2, int x, int y, int ancho, String etiqueta, int valor, Rectangle destino) {
-        g2.setFont(new Font("SansSerif", Font.BOLD, 14));
-        g2.setColor(new Color(255, 225, 130));
-        g2.drawString("> " + etiqueta + ": " + valor + "%", x, y + 14);
-
-        int barY = y + 22;
-        int barH = 14;
-        destino.setBounds(x, barY, ancho, barH);
-        g2.setColor(new Color(55, 60, 72));
-        g2.fillRoundRect(x, barY, ancho, barH, 6, 6);
-        g2.setColor(new Color(230, 170, 60));
-        g2.fillRoundRect(x, barY, ancho * valor / 100, barH, 6, 6);
-        g2.setColor(Color.WHITE);
-        g2.drawRoundRect(x, barY, ancho, barH, 6, 6);
     }
 
     // Bonus activos y segundos que les quedan (furia: mas daño; rapidez: mas velocidad).

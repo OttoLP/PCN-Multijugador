@@ -6,11 +6,9 @@ import java.awt.event.KeyListener;
 public class KeyManager2 implements KeyListener {
     private volatile boolean keyUp, keyDown, keyLeft, keyRigth;
     private volatile Runnable onToggleMenu;
-    private volatile java.util.function.IntConsumer onMenuKey;
 
-    public void setMenuHandlers(Runnable onToggleMenu, java.util.function.IntConsumer onMenuKey) {
+    public void setManejadorMenu(Runnable onToggleMenu) {
         this.onToggleMenu = onToggleMenu;
-        this.onMenuKey = onMenuKey;
     }
 
     @Override
@@ -25,10 +23,6 @@ public class KeyManager2 implements KeyListener {
             Runnable toggle = onToggleMenu;
             if (toggle != null) toggle.run();
             return;
-        }
-        java.util.function.IntConsumer menuHandler = onMenuKey;
-        if (menuHandler != null) {
-            menuHandler.accept(code);
         }
         switch(code){
             case KeyEvent.VK_W:

@@ -30,12 +30,14 @@ public class Cliente {
         this.socket = socket;
     }
 
-    public void autenticar() throws IOException {
+    // archivo: .properties con usuario y password del jugador (por ejemplo config/Jugador1.properties).
+    public void autenticar(String archivo) throws IOException {
         try {
             Properties datos = new Properties();
-            String archivo = System.getProperty("config", "cliente.properties");
             try (Reader lector = new FileReader(archivo, StandardCharsets.UTF_8)) {
                 datos.load(lector);
+            } catch (FileNotFoundException e) {
+                throw new IOException("No existe el archivo " + archivo);
             }
             usuario = datos.getProperty("usuario");
             String password = datos.getProperty("password");
